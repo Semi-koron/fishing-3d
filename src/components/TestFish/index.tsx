@@ -2,22 +2,32 @@ import { useGLTF, useAnimations } from "@react-three/drei";
 import { useEffect, useRef } from "react";
 import type { Group, Vector3 } from "three";
 
+import { a, Interpolation } from "@react-spring/three";
+
 interface TestFishProps {
-  position?: [number, number, number] | Vector3;
+  position: [
+    Interpolation<number, number>,
+    Interpolation<number, number>,
+    Interpolation<number, number>
+  ];
   scale?: [number, number, number] | Vector3 | number;
-  rotation?: [number, number, number];
+  rotation: [
+    Interpolation<number, number>,
+    Interpolation<number, number>,
+    Interpolation<number, number>
+  ];
   animationName?: string;
   autoPlay?: boolean;
   speed?: number;
 }
 
-const TestFish = ({ 
-  position = [0, 0, 0], 
-  scale = 1, 
-  rotation = [0, 0, 0],
+const TestFish = ({
+  position,
+  rotation,
+  scale = 1,
   animationName,
   autoPlay = true,
-  speed = 1
+  speed = 1,
 }: TestFishProps) => {
   const group = useRef<Group>(null);
 
@@ -26,11 +36,11 @@ const TestFish = ({
 
   useEffect(() => {
     const targetAnimation = animationName || names[0];
-    
+
     if (targetAnimation && actions[targetAnimation]) {
       const action = actions[targetAnimation];
       action.timeScale = speed;
-      
+
       if (autoPlay) {
         action.play();
       } else {
@@ -40,14 +50,18 @@ const TestFish = ({
   }, [actions, names, animationName, autoPlay, speed]);
 
   return (
-    <group 
-      ref={group} 
-      position={position} 
-      scale={scale} 
-      rotation={rotation}
+    <a.mesh
+      ref={group}
+      position-x={position[0]}
+      position-y={position[1]}
+      position-z={0}
+      scale={scale}
+      rotation-x={rotation[0]}
+      rotation-y={rotation[1]}
+      rotation-z={rotation[2]}
     >
       <primitive object={scene} />
-    </group>
+    </a.mesh>
   );
 };
 
