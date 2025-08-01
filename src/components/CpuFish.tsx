@@ -30,7 +30,7 @@ const CpuFish = ({
     fishXRotAnimationRef,
     fishYRotAnimationRef,
     fishZRotAnimationRef,
-    pos,
+    clock,
     setFishPosition,
   } = useFishCpu(initialPosition, currentTarget);
 
@@ -39,7 +39,7 @@ const CpuFish = ({
     const randomY = (Math.random() - 0.5) * 5;
     const randomZ = (Math.random() - 0.5) * 1;
 
-    if (Math.random() < 0.01 && (pos.get() === 0 || pos.get() === 1)) {
+    if (Math.random() < 0.01 && (clock.get() === 0 || clock.get() === 1)) {
       const newTarget: Position = [randomX, randomY, randomZ];
       setCurrentTarget(newTarget);
       setFishPosition(randomX, randomY, randomZ);
