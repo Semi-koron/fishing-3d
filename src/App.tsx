@@ -1,6 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import "./App.css";
-import TestFish from "./components/TestFish";
+import CpuFish from "./components/CpuFish";
 
 function App() {
   return (
@@ -15,7 +15,12 @@ function App() {
           intensity={Math.PI}
         />
         <pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />
-        <TestFish autoPlay={true} />
+        <CpuFish
+          initialPosition={[0, 0, 0]}
+          scale={1}
+          animationName="swim"
+          speed={1}
+        />
       </Canvas>
     </>
   );
