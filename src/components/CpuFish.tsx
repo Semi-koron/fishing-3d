@@ -1,4 +1,4 @@
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useRef, useState } from "react";
 import { animated } from "@react-spring/three";
 import useFishCpu from "../hooks/useFishCpu";
@@ -26,6 +26,7 @@ const CpuFish = ({
 }: CpuFishProps) => {
   const groupRef = useRef<Group>(null);
   const [currentTarget, setCurrentTarget] = useState<Position>(targetPosition);
+  const { viewport } = useThree();
 
   const {
     fishXPosAnimationRef,
@@ -39,17 +40,43 @@ const CpuFish = ({
   } = useFishCpu(initialPosition, currentTarget);
 
   useFrame(() => {
-    const randomX = (Math.random() - 0.5) * 1;
-    const randomY = (Math.random() - 0.5) * 5;
-    const randomZ = (Math.random() - 0.5) * 1;
+    const bounds = {
+      minX: -viewport.width / 2,
+      maxX: viewport.width / 2,
+      minY: -viewport.height / 2,
+      maxY: viewport.height / 2,
+      minZ: -2,
+      maxZ: 2,
+    };
 
-    if (Math.random() < 0.01 && (clock.get() === 0 || clock.get() === 1)) {
+    const randomX = Math.max(
+      bounds.minX,
+      Math.min(bounds.maxX, (Math.random() - 0.5) * viewport.width * 0.8)
+    );
+    const randomY = Math.max(
+      bounds.minY,
+      Math.min(bounds.maxY, (Math.random() - 0.5) * viewport.height * 0.8)
+    );
+    const randomZ = Math.max(
+      bounds.minZ,
+      Math.min(bounds.maxZ, (Math.random() - 0.5) * 4)
+    );
+
+    if (Math.random() < 0.03 && (clock.get() === 0 || clock.get() === 1)) {
       let minDist = Infinity;
       let minFloat: Float | null = null;
       let targetPosition: Position = [randomX, randomY, randomZ];
       floatsInfo.forEach((float) => {
-        const dist = calcFloatFishDist([randomX, randomY, randomZ], float);
-        if (dist < 0.5 && dist < minDist) {
+        const dist = calcFloatFishDist(
+          [
+            fishXPosAnimationRef.current.get(),
+            fishYPosAnimationRef.current.get(),
+            fishZPosAnimationRef.current.get(),
+          ],
+          float
+        );
+        console.log(dist);
+        if (dist < 2.5 && dist < minDist) {
           minDist = dist;
           minFloat = float;
           targetPosition = [
@@ -57,12 +84,13 @@ const CpuFish = ({
             float.position.y,
             float.position.z,
           ];
+          console.log("Fish is near a float", float);
         }
       });
 
       const newTarget: Position = targetPosition;
       setCurrentTarget(newTarget);
-      setFishPosition(randomX, randomY, randomZ);
+      setFishPosition(newTarget[0], newTarget[1], newTarget[2]);
     }
   });
 

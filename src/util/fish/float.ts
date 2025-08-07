@@ -1,4 +1,3 @@
-import { exp } from "three/tsl";
 import type { Float } from "../../types/float";
 import type { Position } from "../../types/three";
 
