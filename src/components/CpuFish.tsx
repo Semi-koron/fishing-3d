@@ -5,10 +5,13 @@ import useFishCpu from "../hooks/useFishCpu";
 import TestFish from "./TestFish";
 import type { Position } from "../types/three";
 import type { Group } from "three";
+import type { Float } from "../types/float";
+import { calcFloatFishDist } from "../util/fish/float";
 
 interface CpuFishProps {
   initialPosition?: Position;
   targetPosition?: Position;
+  floatsInfo?: Float[];
   scale?: [number, number, number] | number;
   animationName?: string;
   speed?: number;
@@ -16,7 +19,8 @@ interface CpuFishProps {
 
 const CpuFish = ({
   initialPosition = [0, 0, 0],
-  targetPosition = [5, 2, 3],
+  targetPosition = [0, 1, 0],
+  floatsInfo = [],
   scale = 1,
   speed = 1,
 }: CpuFishProps) => {
@@ -40,7 +44,23 @@ const CpuFish = ({
     const randomZ = (Math.random() - 0.5) * 1;
 
     if (Math.random() < 0.01 && (clock.get() === 0 || clock.get() === 1)) {
-      const newTarget: Position = [randomX, randomY, randomZ];
+      let minDist = Infinity;
+      let minFloat: Float | null = null;
+      let targetPosition: Position = [randomX, randomY, randomZ];
+      floatsInfo.forEach((float) => {
+        const dist = calcFloatFishDist([randomX, randomY, randomZ], float);
+        if (dist < 0.5 && dist < minDist) {
+          minDist = dist;
+          minFloat = float;
+          targetPosition = [
+            float.position.x,
+            float.position.y,
+            float.position.z,
+          ];
+        }
+      });
+
+      const newTarget: Position = targetPosition;
       setCurrentTarget(newTarget);
       setFishPosition(randomX, randomY, randomZ);
     }
