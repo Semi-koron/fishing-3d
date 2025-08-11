@@ -4,7 +4,7 @@ import { useGLTF, useAnimations } from "@react-three/drei";
 import type { Group } from "three";
 import "./index.module.css";
 
-interface FishState {
+interface ObjectState {
   position: [number, number, number];
   rotation: [number, number, number];
 }
@@ -19,8 +19,8 @@ const CircularSwimmingFish = ({
   onFishStateChange,
   fishState,
 }: {
-  onFishStateChange?: (state: FishState) => void;
-  fishState?: FishState;
+  onFishStateChange?: (state: ObjectState) => void;
+  fishState?: ObjectState;
 }) => {
   const group = useRef<Group>(null);
   const timeRef = useRef(0);
@@ -83,9 +83,8 @@ const CameraController = ({ offset }: { offset: CameraOffset }) => {
 const Test = () => {
   const [childWindow, setChildWindow] = useState<Window | null>(null);
   const [isChild, setIsChild] = useState(false);
-  const [receivedFishState, setReceivedFishState] = useState<FishState | null>(
-    null
-  );
+  const [receivedFishState, setReceivedFishState] =
+    useState<ObjectState | null>(null);
   const [cameraOffset, setCameraOffset] = useState<CameraOffset>({
     x: 0,
     y: 0,
@@ -103,8 +102,8 @@ const Test = () => {
     setIsChild(urlParams.get("child") === "true");
 
     const handleMessage = (event: MessageEvent) => {
-      if (event.data.type === "FISH_STATE_UPDATE") {
-        setReceivedFishState(event.data.fishState);
+      if (event.data.type === "OBJECT_STATE_UPDATE") {
+        setReceivedFishState(event.data.objectState);
       }
       if (event.data.type === "CAMERA_OFFSET_UPDATE") {
         setReceivedCameraOffset(event.data.cameraOffset);
@@ -127,12 +126,12 @@ const Test = () => {
     setChildWindow(newWindow);
   };
 
-  const handleFishStateChange = (newFishState: FishState) => {
+  const handleFishStateChange = (newFishState: ObjectState) => {
     if (childWindow && !childWindow.closed) {
       childWindow.postMessage(
         {
-          type: "FISH_STATE_UPDATE",
-          fishState: newFishState,
+          type: "OBJECT_STATE_UPDATE",
+          objectState: newFishState,
         },
         window.location.origin
       );

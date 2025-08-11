@@ -40,9 +40,18 @@ const useFishCpu = (initPos?: Position, toPos?: Position, toRot?: number) => {
     const from = isAnimated === 0 ? beforePos : [x, y, z];
     const to = isAnimated === 0 ? [x, y, z] : beforePos;
 
-    fishXPosAnimationRef.current = clock.to([0, 1], [from[0], to[0]]);
-    fishYPosAnimationRef.current = clock.to([0, 1], [from[1], to[1]]);
-    fishZPosAnimationRef.current = clock.to([0, 1], [from[2], to[2]]);
+    fishXPosAnimationRef.current = clock.to(
+      [0, 0.1, 0.9, 1],
+      [from[0], from[0], to[0], to[0]]
+    );
+    fishYPosAnimationRef.current = clock.to(
+      [0, 0.1, 0.9, 1],
+      [from[1], from[1], to[1], to[1]]
+    );
+    fishZPosAnimationRef.current = clock.to(
+      [0, 0.1, 0.9, 1],
+      [from[2], from[2], to[2], to[2]]
+    );
 
     const beforeRot = fishZRotAnimationRef.current.get();
     const dx = x - beforePos[0];

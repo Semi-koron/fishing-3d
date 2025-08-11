@@ -7,11 +7,13 @@ import type { Position } from "../types/three";
 import type { Group } from "three";
 import type { Float } from "../types/float";
 import { calcFloatFishDist } from "../util/fish/float";
+import type { ObjectState } from "../types/multWindow";
 
 interface CpuFishProps {
   initialPosition?: Position;
   targetPosition?: Position;
   floatsInfo?: Float[];
+  handleFishStateChange?: (state: ObjectState) => void;
   scale?: [number, number, number] | number;
   animationName?: string;
   speed?: number;
@@ -20,6 +22,7 @@ interface CpuFishProps {
 const CpuFish = ({
   initialPosition = [0, 0, 0],
   targetPosition = [0, 1, 0],
+  handleFishStateChange,
   floatsInfo = [],
   scale = 1,
   speed = 1,
@@ -91,7 +94,31 @@ const CpuFish = ({
       const newTarget: Position = targetPosition;
       setCurrentTarget(newTarget);
       setFishPosition(newTarget[0], newTarget[1], newTarget[2]);
+      handleFishStateChange?.({
+        position: [
+          fishXPosAnimationRef.current.get(),
+          fishYPosAnimationRef.current.get(),
+          fishZPosAnimationRef.current.get(),
+        ],
+        rotation: [
+          fishXRotAnimationRef.current.get(),
+          fishYRotAnimationRef.current.get(),
+          fishZRotAnimationRef.current.get(),
+        ],
+      });
     }
+    handleFishStateChange?.({
+      position: [
+        fishXPosAnimationRef.current.get(),
+        fishYPosAnimationRef.current.get(),
+        fishZPosAnimationRef.current.get(),
+      ],
+      rotation: [
+        fishXRotAnimationRef.current.get(),
+        fishYRotAnimationRef.current.get(),
+        fishZRotAnimationRef.current.get(),
+      ],
+    });
   });
 
   return (
