@@ -26,6 +26,8 @@ export default function Game() {
   const [floatsInfo, setFloatsInfo] = useState<Float[]>([]);
   const [receivedFishState, setReceivedFishState] =
     useState<ObjectState | null>(null);
+  const [receivedFloatState, setReceivedFloatState] =
+    useState<ObjectState | null>(null);
 
   const handleCanvasClick = (event: any) => {
     const newFloat: Float = {
@@ -43,6 +45,13 @@ export default function Game() {
     };
 
     setFloatsInfo([newFloat]);
+    childWindow?.postMessage({
+      type: "FLOAT_STATE_UPDATE",
+      objectState: {
+        position: [event.point.x, event.point.y, event.point.z],
+        rotation: [0, 0, 0],
+      },
+    });
   };
 
   const [childWindow, setChildWindow] = useState<Window | null>(null);
@@ -59,14 +68,21 @@ export default function Game() {
       z: 0,
     });
 
+  //マルチウィンドウの処理
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     setIsChild(urlParams.get("child") === "true");
 
     const handleMessage = (event: MessageEvent) => {
+      // 魚の状態を受信
       if (event.data.type === "OBJECT_STATE_UPDATE") {
         setReceivedFishState(event.data.objectState);
       }
+      // 浮きの状態を受信
+      if (event.data.type === "FLOAT_STATE_UPDATE") {
+        setReceivedFloatState(event.data.objectState);
+      }
+      // カメラのオフセットを受信
       if (event.data.type === "CAMERA_OFFSET_UPDATE") {
         setReceivedCameraOffset(event.data.cameraOffset);
       }
@@ -241,16 +257,23 @@ export default function Game() {
             rotation={receivedFishState?.rotation}
           />
         )}
-        {floatsInfo[0] && (
-          <FloatModel
-            position={[
-              floatsInfo[0].position.x,
-              floatsInfo[0].position.y,
-              floatsInfo[0].position.z,
-            ]}
-            rotation={[Math.PI / 2, 0, 0]}
-          />
-        )}
+        {isChild
+          ? receivedFloatState && (
+              <FloatModel
+                position={receivedFloatState.position}
+                rotation={[Math.PI / 2, 0, 0]}
+              />
+            )
+          : floatsInfo[0] && (
+              <FloatModel
+                position={[
+                  floatsInfo[0].position.x,
+                  floatsInfo[0].position.y,
+                  floatsInfo[0].position.z,
+                ]}
+                rotation={[Math.PI / 2, 0, 0]}
+              />
+            )}
       </Canvas>
     </>
   );
