@@ -5,17 +5,21 @@ import type { Group, Vector3 } from "three";
 import { a, Interpolation } from "@react-spring/three";
 
 interface TestFishProps {
-  position: [
-    Interpolation<number, number>,
-    Interpolation<number, number>,
-    Interpolation<number, number>
-  ];
+  position:
+    | [
+        Interpolation<number, number>,
+        Interpolation<number, number>,
+        Interpolation<number, number>
+      ]
+    | [number, number, number];
   scale?: [number, number, number] | Vector3 | number;
-  rotation: [
-    Interpolation<number, number>,
-    Interpolation<number, number>,
-    Interpolation<number, number>
-  ];
+  rotation:
+    | [
+        Interpolation<number, number>,
+        Interpolation<number, number>,
+        Interpolation<number, number>
+      ]
+    | [number, number, number];
   animationName?: string;
   autoPlay?: boolean;
   speed?: number;
