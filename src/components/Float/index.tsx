@@ -1,7 +1,6 @@
-import { useGLTF } from "@react-three/drei";
+import { Html, useGLTF } from "@react-three/drei";
 import { useRef } from "react";
 import type { Group, Vector3 } from "three";
-
 
 interface TestFishProps {
   position: [number, number, number];
@@ -10,22 +9,33 @@ interface TestFishProps {
   animationName?: string;
   autoPlay?: boolean;
   speed?: number;
+  children?: React.ReactNode;
 }
 
-const FloatModel = ({ position, rotation, scale = 1 }: TestFishProps) => {
+const FloatModel = ({
+  position,
+  rotation,
+  scale = 1,
+  children,
+}: TestFishProps) => {
   const group = useRef<Group>(null);
 
   const { scene } = useGLTF("/float.glb");
 
   return (
-    <mesh
-      ref={group}
-      position={[position[0], position[1], position[2]]}
-      scale={scale}
-      rotation={rotation}
-    >
-      <primitive object={scene} />
-    </mesh>
+    <>
+      <Html position={position} center>
+        <div>{children}</div>
+      </Html>
+      <mesh
+        ref={group}
+        position={[position[0], position[1], position[2]]}
+        scale={scale}
+        rotation={rotation}
+      >
+        <primitive object={scene} />
+      </mesh>
+    </>
   );
 };
 

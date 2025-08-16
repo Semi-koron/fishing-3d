@@ -1,10 +1,11 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import CpuFish from "../../CpuFish";
 import type { Float } from "../../../types/float";
 import FloatModel from "../../Float";
 import type { ObjectState } from "../../../types/multWindow";
 import TestFish from "../../TestFish";
+import type { Position } from "../../../types/three";
 interface CameraOffset {
   x: number;
   y: number;
@@ -23,35 +24,23 @@ const CameraController = ({ offset }: { offset: CameraOffset }) => {
 };
 
 export default function Game() {
-  const [floatsInfo, setFloatsInfo] = useState<Float[]>([]);
+  const [floatsInfo, setFloatsInfo] = useState<Float[]>([
+    {
+      status: "idle",
+      position: { x: 3, y: 3, z: 0 },
+      fishermanPosition: { x: 0, y: 0, z: 0 },
+    },
+  ]);
   const [receivedFishState, setReceivedFishState] =
     useState<ObjectState | null>(null);
   const [receivedFloatState, setReceivedFloatState] =
     useState<ObjectState | null>(null);
+  const [markerPosition, setMarkerPosition] = useState<Position | null>(null);
+  const [isQPressed, setIsQPressed] = useState(false);
 
   const handleCanvasClick = (event: any) => {
-    const newFloat: Float = {
-      status: "float",
-      position: {
-        x: event.point.x,
-        y: event.point.y,
-        z: event.point.z,
-      },
-      fishermanPosition: {
-        x: 0,
-        y: 0,
-        z: 0,
-      },
-    };
-
-    setFloatsInfo([newFloat]);
-    childWindow?.postMessage({
-      type: "FLOAT_STATE_UPDATE",
-      objectState: {
-        position: [event.point.x, event.point.y, event.point.z],
-        rotation: [0, 0, 0],
-      },
-    });
+    // クリック位置にマーカーを設置
+    setMarkerPosition([event.point.x, event.point.y, event.point.z]);
   };
 
   const [childWindow, setChildWindow] = useState<Window | null>(null);
@@ -67,6 +56,114 @@ export default function Game() {
       y: 0,
       z: 0,
     });
+
+  // qキー押下検知
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === "q") {
+        setIsQPressed(true);
+        setFloatsInfo((prevFloats) => {
+          return prevFloats.map((float) => ({
+            status: "moving",
+            position: { ...float.position },
+            fishermanPosition: { ...float.fishermanPosition },
+          }));
+        });
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === "q") {
+        setIsQPressed(false);
+        setFloatsInfo((prevFloats) => {
+          return prevFloats.map((float) => ({
+            status: "float",
+            position: { ...float.position },
+            fishermanPosition: { ...float.fishermanPosition },
+          }));
+        });
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
+  // qキー押下中にfloatをマーカー位置へ移動
+  useEffect(() => {
+    if (!isQPressed || !markerPosition || floatsInfo.length === 0) return;
+
+    const intervalId = setInterval(() => {
+      setFloatsInfo((prevFloats) => {
+        const updatedFloats = prevFloats.map((float) => {
+          const currentPos = float.position;
+          const targetPos = {
+            x: markerPosition[0],
+            y: markerPosition[1],
+            z: markerPosition[2],
+          };
+
+          // 方向ベクトルを計算して正規化し、固定距離(0.1)だけ移動
+          const direction = {
+            x: targetPos.x - currentPos.x,
+            y: targetPos.y - currentPos.y,
+            z: targetPos.z - currentPos.z,
+          };
+
+          // ベクトルの長さを計算
+          const length = Math.sqrt(
+            direction.x * direction.x +
+              direction.y * direction.y +
+              direction.z * direction.z
+          );
+
+          // 長さが0の場合（同じ位置）は移動しない
+          if (length === 0) return float;
+
+          // 方向ベクトルを正規化
+          const normalizedDirection = {
+            x: direction.x / length,
+            y: direction.y / length,
+            z: direction.z / length,
+          };
+
+          // 固定距離(0.1)だけ移動
+          const moveDistance = 0.1;
+          const newPos = {
+            x: currentPos.x + normalizedDirection.x * moveDistance,
+            y: currentPos.y + normalizedDirection.y * moveDistance,
+            z: currentPos.z + normalizedDirection.z * moveDistance,
+          };
+
+          return { ...float, position: newPos };
+        });
+
+        // childWindowにも状態を送信
+        if (updatedFloats.length > 0) {
+          childWindow?.postMessage({
+            type: "FLOAT_STATE_UPDATE",
+            objectState: {
+              position: [
+                updatedFloats[0].position.x,
+                updatedFloats[0].position.y,
+                updatedFloats[0].position.z,
+              ],
+              rotation: [0, 0, 0],
+            },
+          });
+        }
+
+        return updatedFloats;
+      });
+    }, 16); // 約60FPS
+
+    return () => clearInterval(intervalId);
+  }, [isQPressed, markerPosition, childWindow]);
 
   //マルチウィンドウの処理
   useEffect(() => {
@@ -257,12 +354,23 @@ export default function Game() {
             rotation={receivedFishState?.rotation}
           />
         )}
+
+        {/* マーカーキューブの表示 */}
+        {markerPosition && !isChild && (
+          <mesh position={markerPosition}>
+            <boxGeometry args={[0.2, 0.2, 0.2]} />
+            <meshBasicMaterial color="red" transparent opacity={0.7} />
+          </mesh>
+        )}
+
         {isChild
           ? receivedFloatState && (
               <FloatModel
                 position={receivedFloatState.position}
                 rotation={[Math.PI / 2, 0, 0]}
-              />
+              >
+                {floatsInfo[0]?.status}
+              </FloatModel>
             )
           : floatsInfo[0] && (
               <FloatModel
