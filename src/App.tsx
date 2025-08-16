@@ -4,6 +4,7 @@ import "./App.css";
 import CpuFish from "./components/CpuFish";
 import type { Float } from "./types/float";
 import FloatModel from "./components/Float";
+import { JoyConController } from "./components/JoyCon";
 
 function App() {
   const [floatsInfo, setFloatsInfo] = useState<Float[]>([]);
@@ -28,6 +29,7 @@ function App() {
 
   return (
     <>
+      <JoyConController />
       <Canvas>
         <ambientLight intensity={Math.PI / 2} />
         <spotLight
