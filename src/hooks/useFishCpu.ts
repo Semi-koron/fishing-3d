@@ -1,5 +1,5 @@
 import { useSpring } from "@react-spring/web";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { Position } from "../types/three";
 
 const useFishCpu = (initPos?: Position, toPos?: Position, toRot?: number) => {

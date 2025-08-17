@@ -1,11 +1,13 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import CpuFish from "../../CpuFish";
 import type { Float } from "../../../types/float";
 import FloatModel from "../../Float";
 import type { ObjectState } from "../../../types/multWindow";
 import TestFish from "../../TestFish";
 import type { Position } from "../../../types/three";
+import { useJoyCon } from "../../../hooks/useJoycon";
+import { PlayerCube } from "../../PlayerCube";
 interface CameraOffset {
   x: number;
   y: number;
@@ -23,7 +25,16 @@ const CameraController = ({ offset }: { offset: CameraOffset }) => {
   return null;
 };
 
+
 export default function Game() {
+  const { players, connect, toggleStick, lastError } = useJoyCon();
+  const [playerFloats, setPlayerFloats] = useState<(Float | null)[]>(
+    Array(4).fill({
+      status: "idle" as const,
+      position: { x: 0, y: 0, z: 0 },
+      fishermanPosition: { x: 0, y: 0, z: 0 },
+    })
+  );
   const [floatsInfo, setFloatsInfo] = useState<Float[]>([
     {
       status: "idle",
@@ -38,7 +49,9 @@ export default function Game() {
   const [markerPosition, setMarkerPosition] = useState<Position | null>(null);
   const [isQPressed, setIsQPressed] = useState(false);
 
-  const handleCanvasClick = (event: any) => {
+  const handleCanvasClick = (
+    event: import("@react-three/fiber").ThreeEvent<MouseEvent>
+  ) => {
     // クリック位置にマーカーを設置
     setMarkerPosition([event.point.x, event.point.y, event.point.z]);
   };
@@ -232,6 +245,37 @@ export default function Game() {
     }
   };
 
+  const handleCastFloat = (playerId: number, direction: number, power: number) => {
+    setPlayerFloats(prev => {
+      const newFloats = [...prev];
+      if (newFloats[playerId]?.status === "idle") {
+        const playerPosition = [
+          (-(players.length - 1) * 4) / 2 + playerId * 4,
+          -5,
+          0
+        ];
+        
+        // 浮きを投げる距離を計算（パワーに基づく）
+        const distance = Math.max(3, Math.min(10, power * 15));
+        
+        newFloats[playerId] = {
+          status: "float",
+          position: {
+            x: playerPosition[0] + Math.cos(direction) * distance,
+            y: playerPosition[1] + Math.sin(direction) * distance,
+            z: 0,
+          },
+          fishermanPosition: {
+            x: playerPosition[0],
+            y: playerPosition[1],
+            z: playerPosition[2],
+          },
+        };
+      }
+      return newFloats;
+    });
+  };
+
   const currentCameraOffset = isChild ? receivedCameraOffset : cameraOffset;
 
   return (
@@ -382,7 +426,90 @@ export default function Game() {
                 rotation={[Math.PI / 2, 0, 0]}
               />
             )}
+
+        {/* プレイヤーキューブの配置 */}
+        {!isChild &&
+          players.map((player, index) => {
+            const spacing = 4;
+            const startX = (-(players.length - 1) * spacing) / 2;
+            const position: [number, number, number] = [
+              startX + index * spacing,
+              -5,
+              0,
+            ];
+
+            return (
+              <PlayerCube
+                key={player.id}
+                player={player}
+                position={position}
+                playerId={index}
+                onConnect={connect}
+                onToggleStick={toggleStick}
+                floatInfo={playerFloats[index]}
+                onCastFloat={handleCastFloat}
+              />
+            );
+          })}
+
+        {/* 投げられた浮きの表示 */}
+        {!isChild &&
+          playerFloats.map((floatInfo, index) => {
+            if (floatInfo?.status === "float") {
+              return (
+                <FloatModel
+                  key={`float-${index}`}
+                  position={[
+                    floatInfo.position.x,
+                    floatInfo.position.y,
+                    floatInfo.position.z,
+                  ]}
+                  rotation={[Math.PI / 2, 0, 0]}
+                />
+              );
+            }
+            return null;
+          })}
       </Canvas>
+
+      {/* エラー表示 */}
+      {lastError && !isChild && (
+        <div
+          style={{
+            position: "absolute",
+            top: 20,
+            right: 20,
+            backgroundColor: "rgba(255, 0, 0, 0.8)",
+            color: "white",
+            padding: 10,
+            borderRadius: 5,
+            zIndex: 1000,
+          }}
+        >
+          Error: {lastError}
+        </div>
+      )}
+
+      {/* 操作説明 */}
+      {!isChild && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 20,
+            left: 20,
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            color: "white",
+            padding: 15,
+            borderRadius: 5,
+            fontSize: 14,
+            zIndex: 1000,
+          }}
+        >
+          <div>🎮 Click cube to connect JoyCon</div>
+          <div>🔄 Double-click to switch stick</div>
+          <div>🕹️ Move stick to rotate cube</div>
+        </div>
+      )}
     </>
   );
 }
