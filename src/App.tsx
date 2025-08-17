@@ -1,5 +1,3 @@
-import { Canvas } from "@react-three/fiber";
-import { useState } from "react";
 import "./App.css";
 import CpuFish from "./components/CpuFish";
 import type { Float } from "./types/float";
