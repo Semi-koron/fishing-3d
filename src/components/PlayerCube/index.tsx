@@ -46,15 +46,11 @@ export const PlayerCube = ({
       setZlStartTime(currentTime);
     } else if (!isZlCurrentlyPressed && isZlPressed) {
       setIsZlPressed(false);
-      
+
       if (floatInfo?.status === "idle" && zlStartTime) {
-        const holdDuration = currentTime - zlStartTime;
-        if (holdDuration > 100) {
-          console.log("Casting float with ZL power:", player.data.accelerometer.x);
-          const power = Math.abs(player.data.accelerometer.x);
-          const direction = ((player.rotation || 0) * Math.PI) / 180;
-          onCastFloat(playerId, direction, power);
-        }
+        const power = Math.abs(player.data.accelerometer.x);
+        const direction = ((player.rotation || 0) * Math.PI) / 180;
+        onCastFloat(playerId, direction, power);
       }
       setZlStartTime(null);
     }
@@ -65,15 +61,11 @@ export const PlayerCube = ({
       setZrStartTime(currentTime);
     } else if (!isZrCurrentlyPressed && isZrPressed) {
       setIsZrPressed(false);
-      
+
       if (floatInfo?.status === "idle" && zrStartTime) {
-        const holdDuration = currentTime - zrStartTime;
-        if (holdDuration > 100) {
-          console.log("Casting float with ZR power:", player.data.accelerometer.x);
-          const power = Math.abs(player.data.accelerometer.x);
-          const direction = ((player.rotation || 0) * Math.PI) / 180;
-          onCastFloat(playerId, direction, power);
-        }
+        const power = Math.abs(player.data.accelerometer.x);
+        const direction = ((player.rotation || 0) * Math.PI) / 180;
+        onCastFloat(playerId, direction, power);
       }
       setZrStartTime(null);
     }
@@ -99,25 +91,6 @@ export const PlayerCube = ({
     }
   });
 
-  // 左右スティックどちらの方向も表示する
-  const leftStick = player.data?.leftStick;
-  const rightStick = player.data?.rightStick;
-  
-  // 左右どちらかのスティックが左右に倒されているかをチェック
-  const hasLeftRightInput = (
-    (leftStick?.direction === "left" || leftStick?.direction === "right") ||
-    (rightStick?.direction === "left" || rightStick?.direction === "right")
-  );
-  
-  // 現在の方向を取得（左スティック優先）
-  const currentDirection = (
-    leftStick?.direction === "left" || leftStick?.direction === "right" 
-      ? leftStick.direction
-      : rightStick?.direction === "left" || rightStick?.direction === "right"
-      ? rightStick.direction
-      : null
-  );
-
   // 浮きの位置計算（プレイヤーキューブの前方2.5単位）
   const floatPosition: [number, number, number] = [
     position[0] + Math.cos(((player.rotation || 0) * Math.PI) / 180) * 2.5,
@@ -139,12 +112,6 @@ export const PlayerCube = ({
           transparent
         />
       </mesh>
-
-      {/* 浮きの表示 */}
-      {floatInfo && floatInfo.status === "idle" && (
-        <FloatModel position={floatPosition} rotation={[Math.PI / 2, 0, 0]} />
-      )}
-
       {/* チャージ中の表示 */}
       {(isZlPressed || isZrPressed) && floatInfo?.status === "idle" && (
         <Text
@@ -167,15 +134,20 @@ export const PlayerCube = ({
           anchorX="center"
           anchorY="middle"
         >
-          {player.deviceType === "left" ? "Left Joy-Con (ZL)" : 
-           player.deviceType === "right" ? "Right Joy-Con (ZR)" :
-           player.deviceType === "pro" ? "Pro Controller" :
-           player.useRightStick ? "Right Stick" : "Left Stick"}
+          {player.deviceType === "left"
+            ? "Left Joy-Con (ZL)"
+            : player.deviceType === "right"
+            ? "Right Joy-Con (ZR)"
+            : player.deviceType === "pro"
+            ? "Pro Controller"
+            : player.useRightStick
+            ? "Right Stick"
+            : "Left Stick"}
         </Text>
       )}
 
       {/* 方向矢印 */}
-      {hasLeftRightInput && currentDirection && (
+      {/* {hasLeftRightInput && currentDirection && (
         <group position={[0, 0, 0.8]}>
           <mesh rotation={[0, 0, currentDirection === "right" ? 0 : Math.PI]}>
             <coneGeometry args={[0.1, 0.3, 3]} />
@@ -186,7 +158,7 @@ export const PlayerCube = ({
             <meshStandardMaterial color="white" />
           </mesh>
         </group>
-      )}
+      )} */}
     </group>
   );
 };

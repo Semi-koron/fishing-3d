@@ -25,7 +25,6 @@ const CameraController = ({ offset }: { offset: CameraOffset }) => {
   return null;
 };
 
-
 export default function Game() {
   const { players, connect, toggleStick, lastError } = useJoyCon();
   const [playerFloats, setPlayerFloats] = useState<(Float | null)[]>(
@@ -35,26 +34,20 @@ export default function Game() {
       fishermanPosition: { x: 0, y: 0, z: 0 },
     })
   );
-  const [floatsInfo, setFloatsInfo] = useState<Float[]>([
-    {
-      status: "idle",
-      position: { x: 3, y: 3, z: 0 },
-      fishermanPosition: { x: 0, y: 0, z: 0 },
-    },
-  ]);
+  // const [floatsInfo, setFloatsInfo] = useState<Float[]>([
+  //   {
+  //     status: "idle",
+  //     position: { x: 3, y: 3, z: 0 },
+  //     fishermanPosition: { x: 0, y: 0, z: 0 },
+  //   },
+  // ]);
   const [receivedFishState, setReceivedFishState] =
     useState<ObjectState | null>(null);
-  const [receivedFloatState, setReceivedFloatState] =
-    useState<ObjectState | null>(null);
-  const [markerPosition, setMarkerPosition] = useState<Position | null>(null);
-  const [isQPressed, setIsQPressed] = useState(false);
-
-  const handleCanvasClick = (
-    event: import("@react-three/fiber").ThreeEvent<MouseEvent>
-  ) => {
-    // クリック位置にマーカーを設置
-    setMarkerPosition([event.point.x, event.point.y, event.point.z]);
-  };
+  const [receivedFloatStates, setReceivedFloatStates] = useState<{
+    [key: number]: ObjectState | null;
+  }>({});
+  // const [markerPosition, setMarkerPosition] = useState<Position | null>(null);
+  // const [isQPressed, setIsQPressed] = useState(false);
 
   const [childWindow, setChildWindow] = useState<Window | null>(null);
   const [isChild, setIsChild] = useState(false);
@@ -71,112 +64,112 @@ export default function Game() {
     });
 
   // qキー押下検知
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() === "q") {
-        setIsQPressed(true);
-        setFloatsInfo((prevFloats) => {
-          return prevFloats.map((float) => ({
-            status: "moving",
-            position: { ...float.position },
-            fishermanPosition: { ...float.fishermanPosition },
-          }));
-        });
-      }
-    };
+  // useEffect(() => {
+  //   const handleKeyDown = (event: KeyboardEvent) => {
+  //     if (event.key.toLowerCase() === "q") {
+  //       setIsQPressed(true);
+  //       setFloatsInfo((prevFloats) => {
+  //         return prevFloats.map((float) => ({
+  //           status: "moving",
+  //           position: { ...float.position },
+  //           fishermanPosition: { ...float.fishermanPosition },
+  //         }));
+  //       });
+  //     }
+  //   };
 
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() === "q") {
-        setIsQPressed(false);
-        setFloatsInfo((prevFloats) => {
-          return prevFloats.map((float) => ({
-            status: "float",
-            position: { ...float.position },
-            fishermanPosition: { ...float.fishermanPosition },
-          }));
-        });
-      }
-    };
+  //   const handleKeyUp = (event: KeyboardEvent) => {
+  //     if (event.key.toLowerCase() === "q") {
+  //       setIsQPressed(false);
+  //       setFloatsInfo((prevFloats) => {
+  //         return prevFloats.map((float) => ({
+  //           status: "float",
+  //           position: { ...float.position },
+  //           fishermanPosition: { ...float.fishermanPosition },
+  //         }));
+  //       });
+  //     }
+  //   };
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
+  //   window.addEventListener("keydown", handleKeyDown);
+  //   window.addEventListener("keyup", handleKeyUp);
 
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-    };
-  }, []);
+  //   return () => {
+  //     window.removeEventListener("keydown", handleKeyDown);
+  //     window.removeEventListener("keyup", handleKeyUp);
+  //   };
+  // }, []);
 
-  // qキー押下中にfloatをマーカー位置へ移動
-  useEffect(() => {
-    if (!isQPressed || !markerPosition || floatsInfo.length === 0) return;
+  // // qキー押下中にfloatをマーカー位置へ移動
+  // useEffect(() => {
+  //   if (!isQPressed || !markerPosition || floatsInfo.length === 0) return;
 
-    const intervalId = setInterval(() => {
-      setFloatsInfo((prevFloats) => {
-        const updatedFloats = prevFloats.map((float) => {
-          const currentPos = float.position;
-          const targetPos = {
-            x: markerPosition[0],
-            y: markerPosition[1],
-            z: markerPosition[2],
-          };
+  //   const intervalId = setInterval(() => {
+  //     setFloatsInfo((prevFloats) => {
+  //       const updatedFloats = prevFloats.map((float) => {
+  //         const currentPos = float.position;
+  //         const targetPos = {
+  //           x: markerPosition[0],
+  //           y: markerPosition[1],
+  //           z: markerPosition[2],
+  //         };
 
-          // 方向ベクトルを計算して正規化し、固定距離(0.1)だけ移動
-          const direction = {
-            x: targetPos.x - currentPos.x,
-            y: targetPos.y - currentPos.y,
-            z: targetPos.z - currentPos.z,
-          };
+  //         // 方向ベクトルを計算して正規化し、固定距離(0.1)だけ移動
+  //         const direction = {
+  //           x: targetPos.x - currentPos.x,
+  //           y: targetPos.y - currentPos.y,
+  //           z: targetPos.z - currentPos.z,
+  //         };
 
-          // ベクトルの長さを計算
-          const length = Math.sqrt(
-            direction.x * direction.x +
-              direction.y * direction.y +
-              direction.z * direction.z
-          );
+  //         // ベクトルの長さを計算
+  //         const length = Math.sqrt(
+  //           direction.x * direction.x +
+  //             direction.y * direction.y +
+  //             direction.z * direction.z
+  //         );
 
-          // 長さが0の場合（同じ位置）は移動しない
-          if (length === 0) return float;
+  //         // 長さが0の場合（同じ位置）は移動しない
+  //         if (length === 0) return float;
 
-          // 方向ベクトルを正規化
-          const normalizedDirection = {
-            x: direction.x / length,
-            y: direction.y / length,
-            z: direction.z / length,
-          };
+  //         // 方向ベクトルを正規化
+  //         const normalizedDirection = {
+  //           x: direction.x / length,
+  //           y: direction.y / length,
+  //           z: direction.z / length,
+  //         };
 
-          // 固定距離(0.1)だけ移動
-          const moveDistance = 0.1;
-          const newPos = {
-            x: currentPos.x + normalizedDirection.x * moveDistance,
-            y: currentPos.y + normalizedDirection.y * moveDistance,
-            z: currentPos.z + normalizedDirection.z * moveDistance,
-          };
+  //         // 固定距離(0.1)だけ移動
+  //         const moveDistance = 0.1;
+  //         const newPos = {
+  //           x: currentPos.x + normalizedDirection.x * moveDistance,
+  //           y: currentPos.y + normalizedDirection.y * moveDistance,
+  //           z: currentPos.z + normalizedDirection.z * moveDistance,
+  //         };
 
-          return { ...float, position: newPos };
-        });
+  //         return { ...float, position: newPos };
+  //       });
 
-        // childWindowにも状態を送信
-        if (updatedFloats.length > 0) {
-          childWindow?.postMessage({
-            type: "FLOAT_STATE_UPDATE",
-            objectState: {
-              position: [
-                updatedFloats[0].position.x,
-                updatedFloats[0].position.y,
-                updatedFloats[0].position.z,
-              ],
-              rotation: [0, 0, 0],
-            },
-          });
-        }
+  //       // childWindowにも状態を送信
+  //       if (updatedFloats.length > 0) {
+  //         childWindow?.postMessage({
+  //           type: "FLOAT_0_STATE_UPDATE",
+  //           objectState: {
+  //             position: [
+  //               updatedFloats[0].position.x,
+  //               updatedFloats[0].position.y,
+  //               updatedFloats[0].position.z,
+  //             ],
+  //             rotation: [0, 0, 0],
+  //           },
+  //         });
+  //       }
 
-        return updatedFloats;
-      });
-    }, 16); // 約60FPS
+  //       return updatedFloats;
+  //     });
+  //   }, 16); // 約60FPS
 
-    return () => clearInterval(intervalId);
-  }, [isQPressed, markerPosition, childWindow]);
+  //   return () => clearInterval(intervalId);
+  // }, [isQPressed, markerPosition, childWindow]);
 
   //マルチウィンドウの処理
   useEffect(() => {
@@ -189,8 +182,17 @@ export default function Game() {
         setReceivedFishState(event.data.objectState);
       }
       // 浮きの状態を受信
-      if (event.data.type === "FLOAT_STATE_UPDATE") {
-        setReceivedFloatState(event.data.objectState);
+      if (
+        event.data.type.startsWith("FLOAT_") &&
+        event.data.type.endsWith("_STATE_UPDATE")
+      ) {
+        const floatId = parseInt(
+          event.data.type.replace("FLOAT_", "").replace("_STATE_UPDATE", "")
+        );
+        setReceivedFloatStates((prev) => ({
+          ...prev,
+          [floatId]: event.data.objectState,
+        }));
       }
       // カメラのオフセットを受信
       if (event.data.type === "CAMERA_OFFSET_UPDATE") {
@@ -245,19 +247,23 @@ export default function Game() {
     }
   };
 
-  const handleCastFloat = (playerId: number, direction: number, power: number) => {
-    setPlayerFloats(prev => {
+  const handleCastFloat = (
+    playerId: number,
+    direction: number,
+    power: number
+  ) => {
+    setPlayerFloats((prev) => {
       const newFloats = [...prev];
       if (newFloats[playerId]?.status === "idle") {
         const playerPosition = [
           (-(players.length - 1) * 4) / 2 + playerId * 4,
           -5,
-          0
+          0,
         ];
-        
+
         // 浮きを投げる距離を計算（パワーに基づく）
         const distance = Math.max(3, Math.min(10, power * 15));
-        
+
         newFloats[playerId] = {
           status: "float",
           position: {
@@ -271,6 +277,21 @@ export default function Game() {
             z: playerPosition[2],
           },
         };
+
+        // マルチウィンドウに浮き状態を送信
+        if (childWindow && !childWindow.closed) {
+          childWindow.postMessage({
+            type: `FLOAT_${playerId}_STATE_UPDATE`,
+            objectState: {
+              position: [
+                newFloats[playerId].position.x,
+                newFloats[playerId].position.y,
+                newFloats[playerId].position.z,
+              ],
+              rotation: [0, 0, 0],
+            },
+          });
+        }
       }
       return newFloats;
     });
@@ -378,10 +399,10 @@ export default function Game() {
           intensity={Math.PI}
         />
         <pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />
-        <mesh onClick={handleCanvasClick} visible={false}>
+        {/* <mesh onClick={handleCanvasClick} visible={false}>
           <planeGeometry args={[100, 100]} />
           <meshBasicMaterial />
-        </mesh>
+        </mesh> */}
         {!isChild && (
           <CpuFish
             initialPosition={[0, 0, 0]}
@@ -389,7 +410,7 @@ export default function Game() {
             animationName="swim"
             speed={1}
             handleFishStateChange={handleFishStateChange}
-            floatsInfo={floatsInfo}
+            floatsInfo={playerFloats.filter((f): f is Float => f !== null)}
           />
         )}
         {isChild && receivedFishState && (
@@ -400,32 +421,25 @@ export default function Game() {
         )}
 
         {/* マーカーキューブの表示 */}
-        {markerPosition && !isChild && (
+        {/* {markerPosition && !isChild && (
           <mesh position={markerPosition}>
             <boxGeometry args={[0.2, 0.2, 0.2]} />
             <meshBasicMaterial color="red" transparent opacity={0.7} />
           </mesh>
-        )}
+        )} */}
 
-        {isChild
-          ? receivedFloatState && (
+        {isChild &&
+          Object.entries(receivedFloatStates).map(([floatId, floatState]) => {
+            if (!floatState) return null;
+            return (
               <FloatModel
-                position={receivedFloatState.position}
+                key={`received-float-${floatId}`}
+                position={floatState.position}
                 rotation={[Math.PI / 2, 0, 0]}
-              >
-                {floatsInfo[0]?.status}
-              </FloatModel>
-            )
-          : floatsInfo[0] && (
-              <FloatModel
-                position={[
-                  floatsInfo[0].position.x,
-                  floatsInfo[0].position.y,
-                  floatsInfo[0].position.z,
-                ]}
-                rotation={[Math.PI / 2, 0, 0]}
+                status="float"
               />
-            )}
+            );
+          })}
 
         {/* プレイヤーキューブの配置 */}
         {!isChild &&
@@ -456,16 +470,20 @@ export default function Game() {
         {!isChild &&
           playerFloats.map((floatInfo, index) => {
             if (floatInfo?.status === "float") {
+              const colors = ["#ff4444", "#44ff44", "#4444ff", "#ffff44"];
+              const playerColor = colors[index] || "#ffffff";
               return (
-                <FloatModel
-                  key={`float-${index}`}
+                <mesh
+                  key={`cast-float-cube-${index}`}
                   position={[
                     floatInfo.position.x,
                     floatInfo.position.y,
                     floatInfo.position.z,
                   ]}
-                  rotation={[Math.PI / 2, 0, 0]}
-                />
+                >
+                  <boxGeometry args={[0.3, 0.3, 0.3]} />
+                  <meshStandardMaterial color={playerColor} />
+                </mesh>
               );
             }
             return null;
