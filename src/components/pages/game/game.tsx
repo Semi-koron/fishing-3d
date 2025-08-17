@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState } from "react";
 import CpuFish from "../../CpuFish";
 import type { Float } from "../../../types/float";
 import FloatModel from "../../Float";
@@ -7,7 +7,7 @@ import type { ObjectState } from "../../../types/multWindow";
 import TestFish from "../../TestFish";
 import type { Position } from "../../../types/three";
 import { useJoyCon } from "../../../hooks/useJoycon";
-import { Text } from "@react-three/drei";
+import { PlayerCube } from "../../PlayerCube";
 interface CameraOffset {
   x: number;
   y: number;
@@ -25,101 +25,16 @@ const CameraController = ({ offset }: { offset: CameraOffset }) => {
   return null;
 };
 
-const PlayerCube = ({
-  player,
-  position,
-  playerId,
-  onConnect,
-  onToggleStick,
-}: {
-  player: any;
-  position: [number, number, number];
-  playerId: number;
-  onConnect: (id: number) => void;
-  onToggleStick: (id: number) => void;
-}) => {
-  const meshRef = useRef<any>();
-  const colors = ["#ff4444", "#44ff44", "#4444ff", "#ffff44"];
-
-  useFrame(() => {
-    if (meshRef.current) {
-      meshRef.current.rotation.z = ((player.rotation || 0) * Math.PI) / 180;
-    }
-  });
-
-  const stick = player.useRightStick
-    ? player.data?.rightStick
-    : player.data?.leftStick;
-
-  return (
-    <group position={position}>
-      <mesh
-        ref={meshRef}
-        onClick={() => !player.isConnected && onConnect(playerId)}
-        onDoubleClick={() => player.isConnected && onToggleStick(playerId)}
-      >
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial
-          color={colors[playerId]}
-          opacity={player.isConnected ? 1 : 0.5}
-          transparent
-        />
-      </mesh>
-
-      {/* プレイヤー番号 */}
-      {/* <Text
-        position={[0, 0, 0.6]}
-        fontSize={0.3}
-        color="white"
-        anchorX="center"
-        anchorY="middle"
-      >
-        P{playerId + 1}
-      </Text> */}
-
-      {/* 接続状態表示 */}
-      {/* <Text
-        position={[0, -0.3, 0.6]}
-        fontSize={0.15}
-        color="white"
-        anchorX="center"
-        anchorY="middle"
-      >
-        {player.isConnected ? player.deviceName : "Click to Connect"}
-      </Text> */}
-
-      {/* スティック切り替え表示 */}
-      {player.isConnected && (
-        <Text
-          position={[0, -0.5, 0.6]}
-          fontSize={0.1}
-          color="yellow"
-          anchorX="center"
-          anchorY="middle"
-        >
-          {player.useRightStick ? "Right Stick" : "Left Stick"}
-        </Text>
-      )}
-
-      {/* 方向矢印 */}
-      {stick && (stick.direction === "left" || stick.direction === "right") && (
-        <group position={[0, 0, 0.8]}>
-          <mesh rotation={[0, 0, stick.direction === "right" ? 0 : Math.PI]}>
-            <coneGeometry args={[0.1, 0.3, 3]} />
-            <meshStandardMaterial color="white" />
-          </mesh>
-          <mesh position={[0, 0, -0.2]}>
-            <cylinderGeometry args={[0.03, 0.03, 0.2]} />
-            <meshStandardMaterial color="white" />
-          </mesh>
-        </group>
-      )}
-    </group>
-  );
-};
 
 export default function Game() {
   const { players, connect, toggleStick, lastError } = useJoyCon();
+  const [playerFloats, setPlayerFloats] = useState<(Float | null)[]>(
+    Array(4).fill({
+      status: "idle" as const,
+      position: { x: 0, y: 0, z: 0 },
+      fishermanPosition: { x: 0, y: 0, z: 0 },
+    })
+  );
   const [floatsInfo, setFloatsInfo] = useState<Float[]>([
     {
       status: "idle",
@@ -134,7 +49,9 @@ export default function Game() {
   const [markerPosition, setMarkerPosition] = useState<Position | null>(null);
   const [isQPressed, setIsQPressed] = useState(false);
 
-  const handleCanvasClick = (event: any) => {
+  const handleCanvasClick = (
+    event: import("@react-three/fiber").ThreeEvent<MouseEvent>
+  ) => {
     // クリック位置にマーカーを設置
     setMarkerPosition([event.point.x, event.point.y, event.point.z]);
   };
@@ -328,6 +245,37 @@ export default function Game() {
     }
   };
 
+  const handleCastFloat = (playerId: number, direction: number, power: number) => {
+    setPlayerFloats(prev => {
+      const newFloats = [...prev];
+      if (newFloats[playerId]?.status === "idle") {
+        const playerPosition = [
+          (-(players.length - 1) * 4) / 2 + playerId * 4,
+          -5,
+          0
+        ];
+        
+        // 浮きを投げる距離を計算（パワーに基づく）
+        const distance = Math.max(3, Math.min(10, power * 15));
+        
+        newFloats[playerId] = {
+          status: "float",
+          position: {
+            x: playerPosition[0] + Math.cos(direction) * distance,
+            y: playerPosition[1] + Math.sin(direction) * distance,
+            z: 0,
+          },
+          fishermanPosition: {
+            x: playerPosition[0],
+            y: playerPosition[1],
+            z: playerPosition[2],
+          },
+        };
+      }
+      return newFloats;
+    });
+  };
+
   const currentCameraOffset = isChild ? receivedCameraOffset : cameraOffset;
 
   return (
@@ -498,8 +446,29 @@ export default function Game() {
                 playerId={index}
                 onConnect={connect}
                 onToggleStick={toggleStick}
+                floatInfo={playerFloats[index]}
+                onCastFloat={handleCastFloat}
               />
             );
+          })}
+
+        {/* 投げられた浮きの表示 */}
+        {!isChild &&
+          playerFloats.map((floatInfo, index) => {
+            if (floatInfo?.status === "float") {
+              return (
+                <FloatModel
+                  key={`float-${index}`}
+                  position={[
+                    floatInfo.position.x,
+                    floatInfo.position.y,
+                    floatInfo.position.z,
+                  ]}
+                  rotation={[Math.PI / 2, 0, 0]}
+                />
+              );
+            }
+            return null;
           })}
       </Canvas>
 

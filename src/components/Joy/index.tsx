@@ -1,102 +1,7 @@
 import { useJoyCon } from "../../hooks/useJoycon";
+import type { StickDirection } from "../../hooks/useJoycon";
 
-// スティックの方向を表す型
-type StickDirection =
-  | "neutral" // 無方向（中心）
-  | "up" // 上
-  | "up-right" // 右上
-  | "right" // 右
-  | "down-right" // 右下
-  | "down" // 下
-  | "down-left" // 左下
-  | "left" // 左
-  | "up-left"; // 左上
-
-// 6軸センサーの詳細表示コンポーネント（3サンプル表示）
-const SixAxisSensorDisplay = ({
-  accelerometerSamples,
-  gyroscopeSamples,
-}: {
-  accelerometerSamples: Array<{ x: number; y: number; z: number }>;
-  gyroscopeSamples: Array<{ x: number; y: number; z: number }>;
-}) => {
-  const timeLabels = ["0ms", "5ms", "10ms"];
-
-  return (
-    <div
-      style={{
-        border: "1px solid #ddd",
-        borderRadius: "8px",
-        padding: "15px",
-        backgroundColor: "#f9f9f9",
-      }}
-    >
-      <h4 style={{ margin: "0 0 15px 0", color: "#2c5aa0" }}>
-        📊 6-Axis Sensor
-      </h4>
-
-      {/* 加速度センサー 3サンプル */}
-      <div style={{ marginBottom: "20px" }}>
-        <h5 style={{ margin: "0 0 10px 0", color: "#d63384" }}>
-          Accelerometer [G]
-        </h5>
-        {accelerometerSamples.map((sample, index) => (
-          <div
-            key={index}
-            style={{
-              fontSize: "12px",
-              fontFamily: "monospace",
-              marginBottom: "5px",
-              padding: "5px",
-              backgroundColor: "#fff",
-              borderRadius: "4px",
-              border: "1px solid #eee",
-            }}
-          >
-            <div style={{ fontWeight: "bold", marginBottom: "3px" }}>
-              ({timeLabels[index]})
-            </div>
-            <div style={{ display: "flex", gap: "15px" }}>
-              <span>X: {sample.x.toFixed(6)}</span>
-              <span>Y: {sample.y.toFixed(6)}</span>
-              <span>Z: {sample.z.toFixed(6)}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ジャイロスコープ 3サンプル */}
-      <div>
-        <h5 style={{ margin: "0 0 10px 0", color: "#198754" }}>
-          Gyroscope [dps]
-        </h5>
-        {gyroscopeSamples.map((sample, index) => (
-          <div
-            key={index}
-            style={{
-              fontSize: "12px",
-              fontFamily: "monospace",
-              marginBottom: "5px",
-              padding: "5px",
-              backgroundColor: "#fff",
-              borderRadius: "4px",
-              border: "1px solid #eee",
-            }}
-          >
-            <div style={{ fontWeight: "bold", marginBottom: "3px" }}>
-              ({timeLabels[index]})
-            </div>
-            <div style={{ display: "flex", gap: "15px" }}>
-              <span>X: {sample.x.toFixed(5)}</span>
-              <span>Y: {sample.y.toFixed(5)}</span>
-              <span>Z: {sample.z.toFixed(5)}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+// 加速度センサーの3D表示コンポーネント
 const AccelerometerVisualizer = ({
   accelerometer,
 }: {
@@ -127,7 +32,7 @@ const AccelerometerVisualizer = ({
         📱 加速度センサー (g)
       </h4>
 
-      {/* 数値表示 - aka256形式に合わせて精度向上 */}
+      {/* 数値表示 */}
       <div
         style={{
           fontSize: "14px",
@@ -198,27 +103,6 @@ const AccelerometerVisualizer = ({
           }}
         >
           Joy-Con
-          {/* 上面表示 */}
-          <div
-            style={{
-              position: "absolute",
-              top: "-2px",
-              left: "-2px",
-              width: `${cubeSize}px`,
-              height: `${cubeSize}px`,
-              backgroundColor: "#5ba0f2",
-              border: "2px solid #357abd",
-              borderRadius: "8px",
-              transform: "rotateX(90deg) translateZ(40px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "10px",
-              color: "white",
-            }}
-          >
-            TOP
-          </div>
         </div>
       </div>
 
@@ -404,367 +288,322 @@ const StickVisualizer = ({
   );
 };
 
-export function JoyConDemo() {
-  const joycon = useJoyCon();
+// プレイヤー別Joy-Con表示コンポーネント
+const PlayerJoyConDisplay = ({ playerId }: { playerId: number }) => {
+  const { players, connect, disconnect, sendRumble, toggleStick } = useJoyCon();
+  const player = players[playerId];
+  
+  if (!player) return null;
+
+  const colors = ['#ff4444', '#44ff44', '#4444ff', '#ffff44'];
 
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
-      <h2>🎮 Joy-Con 完全デモ (aka256形式対応)</h2>
-
-      {/* 接続状態 */}
-      <div style={{ marginBottom: "20px" }}>
-        <p>接続状態: {joycon.isConnected ? "✅ 接続中" : "❌ 未接続"}</p>
-        {joycon.deviceName && <p>デバイス: {joycon.deviceName}</p>}
-        {joycon.lastError && (
-          <p style={{ color: "red" }}>エラー: {joycon.lastError}</p>
-        )}
-      </div>
-
-      {/* 操作ボタン */}
-      <div style={{ marginBottom: "20px" }}>
-        <button onClick={joycon.connect} disabled={joycon.isConnected}>
-          接続
-        </button>
-        <button
-          onClick={joycon.disconnect}
-          disabled={!joycon.isConnected}
-          style={{ marginLeft: "10px" }}
-        >
-          切断
-        </button>
-        <button
-          onClick={() => joycon.sendRumble(1000)}
-          disabled={!joycon.isConnected}
-          style={{ marginLeft: "10px" }}
-        >
-          振動
-        </button>
-      </div>
-
-      {/* 全Joy-Conデータ表示 */}
-      {joycon.data && (
-        <div>
-          <h3>🎮 Joy-Con データ（リアルタイム）</h3>
-
-          {/* バッテリー情報 */}
-          <div
+    <div
+      style={{
+        border: `3px solid ${colors[playerId]}`,
+        borderRadius: "12px",
+        padding: "20px",
+        margin: "10px",
+        backgroundColor: "#f8f9fa",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "15px" }}>
+        <h3 style={{ margin: 0, color: colors[playerId] }}>
+          🎮 プレイヤー {playerId + 1}
+        </h3>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            onClick={() => connect(playerId)}
+            disabled={player.isConnected}
             style={{
-              marginBottom: "20px",
-              padding: "10px",
-              backgroundColor: "#f0f0f0",
-              borderRadius: "5px",
+              padding: "8px 16px",
+              backgroundColor: player.isConnected ? "#6c757d" : "#28a745",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: player.isConnected ? "not-allowed" : "pointer",
             }}
           >
-            <strong>バッテリー: {joycon.data.batteryLevel}/8</strong>
-            <div
-              style={{
-                width: "200px",
-                height: "10px",
-                backgroundColor: "#ddd",
-                borderRadius: "5px",
-                marginTop: "5px",
-              }}
-            >
+            {player.isConnected ? "接続済み" : "接続"}
+          </button>
+          {player.isConnected && (
+            <>
+              <button
+                onClick={() => disconnect(playerId)}
+                style={{
+                  padding: "8px 16px",
+                  backgroundColor: "#dc3545",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                切断
+              </button>
+              <button
+                onClick={() => sendRumble(playerId, 500)}
+                style={{
+                  padding: "8px 16px",
+                  backgroundColor: "#fd7e14",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                振動
+              </button>
+              <button
+                onClick={() => toggleStick(playerId)}
+                style={{
+                  padding: "8px 16px",
+                  backgroundColor: "#6610f2",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                {player.useRightStick ? "右" : "左"}スティック
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {!player.isConnected && (
+        <div style={{ textAlign: "center", padding: "40px", color: "#6c757d" }}>
+          Joy-Conを接続してください
+        </div>
+      )}
+
+      {player.isConnected && player.data && (
+        <div>
+          {/* 基本情報 */}
+          <div style={{ marginBottom: "20px", display: "flex", gap: "20px", flexWrap: "wrap" }}>
+            <div>
+              <strong>デバイス:</strong> {player.deviceName}
+            </div>
+            <div>
+              <strong>バッテリー:</strong> {player.data.batteryLevel}/8
               <div
                 style={{
-                  width: `${(joycon.data.batteryLevel / 8) * 100}%`,
-                  height: "100%",
-                  backgroundColor:
-                    joycon.data.batteryLevel > 2 ? "#28a745" : "#dc3545",
-                  borderRadius: "5px",
+                  width: "100px",
+                  height: "8px",
+                  backgroundColor: "#ddd",
+                  borderRadius: "4px",
+                  marginTop: "2px",
+                  display: "inline-block",
+                  marginLeft: "8px",
                 }}
-              />
+              >
+                <div
+                  style={{
+                    width: `${(player.data.batteryLevel / 8) * 100}%`,
+                    height: "100%",
+                    backgroundColor: player.data.batteryLevel > 2 ? "#28a745" : "#dc3545",
+                    borderRadius: "4px",
+                  }}
+                />
+              </div>
+            </div>
+            <div>
+              <strong>回転:</strong> {player.rotation.toFixed(1)}°
             </div>
           </div>
 
-          {/* メインセンサーセクション */}
+          {/* センサーとスティック */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-              gap: "20px",
+              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+              gap: "15px",
               marginBottom: "20px",
             }}
           >
-            {/* 6軸センサー詳細表示 */}
-            {joycon.data.accelerometerSamples &&
-              joycon.data.gyroscopeSamples && (
-                <SixAxisSensorDisplay
-                  accelerometerSamples={joycon.data.accelerometerSamples}
-                  gyroscopeSamples={joycon.data.gyroscopeSamples}
-                />
-              )}
+            {/* 加速度センサー */}
+            <AccelerometerVisualizer accelerometer={player.data.accelerometer} />
 
-            {/* 加速度センサー（ビジュアル版） */}
-            {joycon.data.accelerometer && (
-              <AccelerometerVisualizer
-                accelerometer={joycon.data.accelerometer}
-              />
-            )}
+            {/* アクティブスティック */}
+            <StickVisualizer
+              stick={player.useRightStick ? player.data.rightStick : player.data.leftStick}
+              title={`${player.useRightStick ? "右" : "左"}スティック (アクティブ)`}
+            />
 
-            {/* ジャイロスコープ - aka256形式で精度向上 */}
-            {joycon.data.gyroscope && (
-              <div
-                style={{
-                  border: "1px solid #ddd",
-                  borderRadius: "8px",
-                  padding: "15px",
-                  backgroundColor: "#f9f9f9",
-                }}
-              >
-                <h4 style={{ margin: "0 0 10px 0", color: "#2c5aa0" }}>
-                  🌀 ジャイロスコープ (°/s)
-                </h4>
-                <div style={{ fontSize: "14px", fontFamily: "monospace" }}>
-                  <div>
-                    X:{" "}
-                    <span style={{ fontWeight: "bold", color: "#d63384" }}>
-                      {joycon.data.gyroscope.x.toFixed(5)}
-                    </span>
-                  </div>
-                  <div>
-                    Y:{" "}
-                    <span style={{ fontWeight: "bold", color: "#198754" }}>
-                      {joycon.data.gyroscope.y.toFixed(5)}
-                    </span>
-                  </div>
-                  <div>
-                    Z:{" "}
-                    <span style={{ fontWeight: "bold", color: "#0d6efd" }}>
-                      {joycon.data.gyroscope.z.toFixed(5)}
-                    </span>
-                  </div>
+            {/* ジャイロスコープ */}
+            <div
+              style={{
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+                padding: "15px",
+                backgroundColor: "#f9f9f9",
+              }}
+            >
+              <h4 style={{ margin: "0 0 10px 0", color: "#2c5aa0" }}>
+                🌀 ジャイロスコープ (°/s)
+              </h4>
+              <div style={{ fontSize: "14px", fontFamily: "monospace" }}>
+                <div>
+                  X:{" "}
+                  <span style={{ fontWeight: "bold", color: "#d63384" }}>
+                    {player.data.gyroscope.x.toFixed(5)}
+                  </span>
                 </div>
-
-                {/* ジャイロ回転視覚化 */}
-                <div style={{ marginTop: "15px", textAlign: "center" }}>
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "#666",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    回転速度可視化
-                  </div>
-                  {["X", "Y", "Z"].map((axis, index) => {
-                    const value = [
-                      joycon.data!.gyroscope!.x,
-                      joycon.data!.gyroscope!.y,
-                      joycon.data!.gyroscope!.z,
-                    ][index];
-                    const rotation = Math.min(180, Math.abs(value) * 5); // 36°/sで180度回転（適度な感度）
-                    const color = ["#d63384", "#198754", "#0d6efd"][index];
-
-                    return (
-                      <div key={axis} style={{ marginBottom: "8px" }}>
-                        <div style={{ fontSize: "11px", marginBottom: "3px" }}>
-                          {axis}軸回転: {value.toFixed(2)}°/s
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexDirection: "column",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "40px",
-                              height: "40px",
-                              border: `4px solid ${color}`,
-                              borderRadius: "50%",
-                              borderTopColor: "transparent",
-                              borderRightColor: "rgba(0,0,0,0.1)",
-                              transform: `rotate(${rotation}deg)`,
-                              transition: "transform 0.05s ease-out",
-                              marginBottom: "5px",
-                            }}
-                          />
-                          <div style={{ fontSize: "10px", color: "#888" }}>
-                            {rotation.toFixed(0)}°
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div>
+                  Y:{" "}
+                  <span style={{ fontWeight: "bold", color: "#198754" }}>
+                    {player.data.gyroscope.y.toFixed(5)}
+                  </span>
+                </div>
+                <div>
+                  Z:{" "}
+                  <span style={{ fontWeight: "bold", color: "#0d6efd" }}>
+                    {player.data.gyroscope.z.toFixed(5)}
+                  </span>
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
-          {/* スティックセクション */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-              gap: "20px",
-              marginBottom: "20px",
-            }}
-          >
-            {/* 左アナログスティック */}
-            <StickVisualizer
-              stick={{
-                x: joycon.getLeftStick()?.x ?? 0,
-                y: joycon.getLeftStick()?.y ?? 0,
-                rawX: joycon.getLeftStick()?.rawX ?? 0,
-                rawY: joycon.getLeftStick()?.rawY ?? 0,
-                direction: joycon.getLeftStickDirection() as StickDirection,
-              }}
-              title="左スティック"
-            />
-
-            {/* 右アナログスティック */}
-            <StickVisualizer
-              stick={{
-                x: joycon.getRightStick()?.x ?? 0,
-                y: joycon.getRightStick()?.y ?? 0,
-                rawX: joycon.getRightStick()?.rawX ?? 0,
-                rawY: joycon.getRightStick()?.rawY ?? 0,
-                direction: joycon.getRightStickDirection() as StickDirection,
-              }}
-              title="右スティック"
-            />
-          </div>
-
-          {/* 全ボタン状態 */}
+          {/* ボタン状態 */}
           <div
             style={{
               border: "1px solid #ddd",
               borderRadius: "8px",
               padding: "15px",
               backgroundColor: "#f9f9f9",
-              marginBottom: "20px",
             }}
           >
             <h4 style={{ margin: "0 0 15px 0", color: "#2c5aa0" }}>
-              🎮 全ボタン状態
+              🎮 ボタン状態
             </h4>
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))",
                 gap: "8px",
                 fontSize: "12px",
               }}
             >
-              {Object.entries(joycon.data.buttons || {}).map(
-                ([key, pressed]) => (
-                  <div
-                    key={key}
-                    style={{
-                      padding: "10px 6px",
-                      borderRadius: "6px",
-                      backgroundColor: pressed ? "#28a745" : "#e9ecef",
-                      color: pressed ? "white" : "#495057",
-                      textAlign: "center",
-                      fontWeight: "bold",
-                      textTransform: "uppercase",
-                      border: pressed
-                        ? "2px solid #1e7e34"
-                        : "2px solid #dee2e6",
-                      transition: "all 0.1s ease",
-                      transform: pressed ? "scale(1.05)" : "scale(1)",
-                    }}
-                  >
-                    {key}
-                  </div>
-                )
+              {Object.entries(player.data.buttons).map(([key, pressed]) => (
+                <div
+                  key={key}
+                  style={{
+                    padding: "8px 4px",
+                    borderRadius: "4px",
+                    backgroundColor: pressed ? "#28a745" : "#e9ecef",
+                    color: pressed ? "white" : "#495057",
+                    textAlign: "center",
+                    fontWeight: "bold",
+                    textTransform: "uppercase",
+                    border: pressed ? "2px solid #1e7e34" : "2px solid #dee2e6",
+                    transition: "all 0.1s ease",
+                    transform: pressed ? "scale(1.05)" : "scale(1)",
+                  }}
+                >
+                  {key}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export function JoyConDemo() {
+  const { players, lastError } = useJoyCon();
+
+  return (
+    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
+      <h2>🎮 Joy-Con マルチプレイヤーデモ</h2>
+
+      {/* エラー表示 */}
+      {lastError && (
+        <div
+          style={{
+            padding: "15px",
+            backgroundColor: "#f8d7da",
+            color: "#721c24",
+            border: "1px solid #f5c6cb",
+            borderRadius: "8px",
+            marginBottom: "20px",
+          }}
+        >
+          <strong>エラー:</strong> {lastError}
+        </div>
+      )}
+
+      {/* 接続状況サマリー */}
+      <div
+        style={{
+          display: "flex",
+          gap: "10px",
+          marginBottom: "30px",
+          padding: "15px",
+          backgroundColor: "#e7f3ff",
+          borderRadius: "8px",
+          border: "1px solid #b8daff",
+        }}
+      >
+        {players.map((player, index) => (
+          <div
+            key={player.id}
+            style={{
+              padding: "10px",
+              borderRadius: "6px",
+              backgroundColor: player.isConnected ? "#d4edda" : "#f8d7da",
+              border: player.isConnected ? "1px solid #c3e6cb" : "1px solid #f5c6cb",
+              minWidth: "120px",
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
+              プレイヤー {index + 1}
+            </div>
+            <div style={{ fontSize: "12px" }}>
+              {player.isConnected ? (
+                <>
+                  <div style={{ color: "#155724" }}>✅ 接続済み</div>
+                  <div>{player.deviceName}</div>
+                  <div>バッテリー: {player.data?.batteryLevel || 0}/8</div>
+                </>
+              ) : (
+                <div style={{ color: "#721c24" }}>❌ 未接続</div>
               )}
             </div>
           </div>
+        ))}
+      </div>
 
-          {/* Raw値表示セクション - aka256互換 */}
-          <div
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: "8px",
-              padding: "15px",
-              backgroundColor: "#f9f9f9",
-              marginBottom: "20px",
-            }}
-          >
-            <h4 style={{ margin: "0 0 15px 0", color: "#2c5aa0" }}>
-              🔢 Raw値（aka256互換表示）
-            </h4>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "20px",
-                fontSize: "12px",
-                fontFamily: "monospace",
-              }}
-            >
-              <div>
-                <h5>加速度センサー (G)</h5>
-                <div>
-                  X: {joycon.data.accelerometer?.x.toFixed(6) || "0.000000"}
-                </div>
-                <div>
-                  Y: {joycon.data.accelerometer?.y.toFixed(6) || "0.000000"}
-                </div>
-                <div>
-                  Z: {joycon.data.accelerometer?.z.toFixed(6) || "0.000000"}
-                </div>
-              </div>
-              <div>
-                <h5>ジャイロスコープ (DPS)</h5>
-                <div>X: {joycon.data.gyroscope?.x.toFixed(5) || "0.00000"}</div>
-                <div>Y: {joycon.data.gyroscope?.y.toFixed(5) || "0.00000"}</div>
-                <div>Z: {joycon.data.gyroscope?.z.toFixed(5) || "0.00000"}</div>
-              </div>
-            </div>
-          </div>
+      {/* 各プレイヤーの詳細表示 */}
+      <div>
+        {players.map((_, index) => (
+          <PlayerJoyConDisplay key={index} playerId={index} />
+        ))}
+      </div>
 
-          {/* デバッグ情報 */}
-          <details>
-            <summary
-              style={{
-                cursor: "pointer",
-                fontSize: "16px",
-                fontWeight: "bold",
-              }}
-            >
-              🔍 詳細データ（デバッグ用）
-            </summary>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "20px",
-                marginTop: "10px",
-              }}
-            >
-              <div>
-                <h4>左スティック</h4>
-                <pre style={{ fontSize: "12px", overflow: "auto" }}>
-                  {JSON.stringify(joycon.getLeftStick(), null, 2)}
-                </pre>
-              </div>
-              <div>
-                <h4>右スティック</h4>
-                <pre style={{ fontSize: "12px", overflow: "auto" }}>
-                  {JSON.stringify(joycon.getRightStick(), null, 2)}
-                </pre>
-              </div>
-            </div>
-            <div style={{ marginTop: "10px" }}>
-              <h4>全データ</h4>
-              <pre
-                style={{
-                  fontSize: "10px",
-                  overflow: "auto",
-                  maxHeight: "300px",
-                }}
-              >
-                {JSON.stringify(joycon.data, null, 2)}
-              </pre>
-            </div>
-          </details>
-        </div>
-      )}
+      {/* 使用方法 */}
+      <div
+        style={{
+          marginTop: "30px",
+          padding: "20px",
+          backgroundColor: "#f8f9fa",
+          borderRadius: "8px",
+          border: "1px solid #dee2e6",
+        }}
+      >
+        <h3>📝 使用方法</h3>
+        <ul style={{ lineHeight: "1.6" }}>
+          <li><strong>接続:</strong> 各プレイヤーの「接続」ボタンをクリックしてJoy-Conを選択</li>
+          <li><strong>スティック切り替え:</strong> 「左スティック」/「右スティック」ボタンで制御対象を変更</li>
+          <li><strong>振動テスト:</strong> 「振動」ボタンでコントローラーを振動させる</li>
+          <li><strong>方向制御:</strong> スティックを左右に動かすとキューブが回転します</li>
+          <li><strong>切断:</strong> 「切断」ボタンでJoy-Conを切断</li>
+        </ul>
+      </div>
     </div>
   );
 }
