@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import CpuFish from "../../CpuFish";
 import type { Float } from "../../../types/float";
 import FloatModel from "../../Float";
@@ -7,6 +7,7 @@ import type { ObjectState } from "../../../types/multWindow";
 import TestFish from "../../TestFish";
 import type { Position } from "../../../types/three";
 import { useJoyCon } from "../../../hooks/useJoycon";
+import type { StickDirection } from "../../../hooks/useJoycon";
 import { PlayerCube } from "../../PlayerCube";
 interface CameraOffset {
   x: number;
@@ -25,6 +26,20 @@ const CameraController = ({ offset }: { offset: CameraOffset }) => {
   return null;
 };
 
+const FloatController = ({ onMove }: { onMove: () => void }) => {
+  useFrame(() => {
+    onMove();
+  });
+
+  return null;
+};
+
+// 目標方向管理用
+interface TargetDirection {
+  current: StickDirection;
+  next: StickDirection;
+}
+
 export default function Game() {
   const { players, connect, toggleStick, lastError } = useJoyCon();
   const [playerFloats, setPlayerFloats] = useState<(Float | null)[]>(
@@ -34,20 +49,11 @@ export default function Game() {
       fishermanPosition: { x: 0, y: 0, z: 0 },
     })
   );
-  // const [floatsInfo, setFloatsInfo] = useState<Float[]>([
-  //   {
-  //     status: "idle",
-  //     position: { x: 3, y: 3, z: 0 },
-  //     fishermanPosition: { x: 0, y: 0, z: 0 },
-  //   },
-  // ]);
   const [receivedFishState, setReceivedFishState] =
     useState<ObjectState | null>(null);
   const [receivedFloatStates, setReceivedFloatStates] = useState<{
     [key: number]: ObjectState | null;
   }>({});
-  // const [markerPosition, setMarkerPosition] = useState<Position | null>(null);
-  // const [isQPressed, setIsQPressed] = useState(false);
 
   const [childWindow, setChildWindow] = useState<Window | null>(null);
   const [isChild, setIsChild] = useState(false);
@@ -63,113 +69,173 @@ export default function Game() {
       z: 0,
     });
 
-  // qキー押下検知
-  // useEffect(() => {
-  //   const handleKeyDown = (event: KeyboardEvent) => {
-  //     if (event.key.toLowerCase() === "q") {
-  //       setIsQPressed(true);
-  //       setFloatsInfo((prevFloats) => {
-  //         return prevFloats.map((float) => ({
-  //           status: "moving",
-  //           position: { ...float.position },
-  //           fishermanPosition: { ...float.fishermanPosition },
-  //         }));
-  //       });
-  //     }
-  //   };
+  // 各プレイヤーの目標方向を管理
+  const [targetDirections, setTargetDirections] = useState<Map<number, TargetDirection>>(new Map());
 
-  //   const handleKeyUp = (event: KeyboardEvent) => {
-  //     if (event.key.toLowerCase() === "q") {
-  //       setIsQPressed(false);
-  //       setFloatsInfo((prevFloats) => {
-  //         return prevFloats.map((float) => ({
-  //           status: "float",
-  //           position: { ...float.position },
-  //           fishermanPosition: { ...float.fishermanPosition },
-  //         }));
-  //       });
-  //     }
-  //   };
+  // 時計回りの次の方向を取得する関数
+  const getNextClockwiseDirection = (current: StickDirection): StickDirection => {
+    const clockwisePattern: StickDirection[] = [
+      "right", "down-right", "down", "down-left", "left", "up-left", "up", "up-right"
+    ];
+    const currentIndex = clockwisePattern.indexOf(current);
+    if (currentIndex === -1) return "right"; // デフォルト
+    return clockwisePattern[(currentIndex + 1) % clockwisePattern.length];
+  };
 
-  //   window.addEventListener("keydown", handleKeyDown);
-  //   window.addEventListener("keyup", handleKeyUp);
+  // 目標方向に到達したかチェックし、到達していたら移動して次の目標を設定
+  const checkAndMoveToTarget = useCallback((direction: StickDirection, playerId: number): boolean => {
+    const target = targetDirections.get(playerId);
+    
+    if (!target) {
+      // 初回の場合、目標方向を設定
+      if (direction !== "neutral") {
+        const nextDirection = getNextClockwiseDirection(direction);
+        setTargetDirections(prev => new Map(prev.set(playerId, {
+          current: direction,
+          next: nextDirection
+        })));
+      }
+      return false;
+    }
 
-  //   return () => {
-  //     window.removeEventListener("keydown", handleKeyDown);
-  //     window.removeEventListener("keyup", handleKeyUp);
-  //   };
-  // }, []);
+    // 目標方向に到達したかチェック
+    if (direction === target.next) {
+      // 到達したので次の目標を設定
+      const nextDirection = getNextClockwiseDirection(direction);
+      setTargetDirections(prev => new Map(prev.set(playerId, {
+        current: direction,
+        next: nextDirection
+      })));
+      return true; // 移動すべき
+    }
 
-  // // qキー押下中にfloatをマーカー位置へ移動
-  // useEffect(() => {
-  //   if (!isQPressed || !markerPosition || floatsInfo.length === 0) return;
+    return false;
+  }, [targetDirections]);
 
-  //   const intervalId = setInterval(() => {
-  //     setFloatsInfo((prevFloats) => {
-  //       const updatedFloats = prevFloats.map((float) => {
-  //         const currentPos = float.position;
-  //         const targetPos = {
-  //           x: markerPosition[0],
-  //           y: markerPosition[1],
-  //           z: markerPosition[2],
-  //         };
+  // floatの最後の状態変更時刻を管理
+  const [lastStateChangeTime, setLastStateChangeTime] = useState<Map<number, number>>(new Map());
 
-  //         // 方向ベクトルを計算して正規化し、固定距離(0.1)だけ移動
-  //         const direction = {
-  //           x: targetPos.x - currentPos.x,
-  //           y: targetPos.y - currentPos.y,
-  //           z: targetPos.z - currentPos.z,
-  //         };
+  // floatを移動させるための関数
+  const moveFloatTowardsPlayer = useCallback(() => {
+    const now = Date.now();
+    
+    setPlayerFloats((prev) => {
+      const newFloats = [...prev];
+      let hasMovement = false;
 
-  //         // ベクトルの長さを計算
-  //         const length = Math.sqrt(
-  //           direction.x * direction.x +
-  //             direction.y * direction.y +
-  //             direction.z * direction.z
-  //         );
+      newFloats.forEach((floatInfo, index) => {
+        if (
+          !floatInfo ||
+          (floatInfo.status !== "float" && floatInfo.status !== "moving")
+        )
+          return;
 
-  //         // 長さが0の場合（同じ位置）は移動しない
-  //         if (length === 0) return float;
+        const player = players[index];
+        if (!player?.isConnected || !player.data) return;
 
-  //         // 方向ベクトルを正規化
-  //         const normalizedDirection = {
-  //           x: direction.x / length,
-  //           y: direction.y / length,
-  //           z: direction.z / length,
-  //         };
+        // プレイヤーの位置を計算
+        const spacing = 4;
+        const startX = (-(players.length - 1) * spacing) / 2;
+        const playerPosition = {
+          x: startX + index * spacing,
+          y: -5,
+          z: 0,
+        };
 
-  //         // 固定距離(0.1)だけ移動
-  //         const moveDistance = 0.1;
-  //         const newPos = {
-  //           x: currentPos.x + normalizedDirection.x * moveDistance,
-  //           y: currentPos.y + normalizedDirection.y * moveDistance,
-  //           z: currentPos.z + normalizedDirection.z * moveDistance,
-  //         };
+        // 左右どちらのスティックでも目標方向チェック
+        const leftDirection = player.data.leftStick.direction;
+        const rightDirection = player.data.rightStick.direction;
 
-  //         return { ...float, position: newPos };
-  //       });
+        const isLeftTargetReached = checkAndMoveToTarget(
+          leftDirection,
+          index * 2
+        ); // 左スティック用ID
+        const isRightTargetReached = checkAndMoveToTarget(
+          rightDirection,
+          index * 2 + 1
+        ); // 右スティック用ID
+        const shouldMove = isLeftTargetReached || isRightTargetReached;
 
-  //       // childWindowにも状態を送信
-  //       if (updatedFloats.length > 0) {
-  //         childWindow?.postMessage({
-  //           type: "FLOAT_0_STATE_UPDATE",
-  //           objectState: {
-  //             position: [
-  //               updatedFloats[0].position.x,
-  //               updatedFloats[0].position.y,
-  //               updatedFloats[0].position.z,
-  //             ],
-  //             rotation: [0, 0, 0],
-  //           },
-  //         });
-  //       }
+        // floatとプレイヤーの距離を計算
+        const dx = playerPosition.x - floatInfo.position.x;
+        const dy = playerPosition.y - floatInfo.position.y;
+        const dz = playerPosition.z - floatInfo.position.z;
+        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-  //       return updatedFloats;
-  //     });
-  //   }, 16); // 約60FPS
+        // 最後の状態変更時刻を取得
+        const lastChange = lastStateChangeTime.get(index) || now;
 
-  //   return () => clearInterval(intervalId);
-  // }, [isQPressed, markerPosition, childWindow]);
+        if (floatInfo.status === "moving") {
+          // 距離が0.1以下になったらidleに戻す
+          if (distance <= 0.1) {
+            newFloats[index] = {
+              ...floatInfo,
+              status: "idle",
+              position: playerPosition,
+            };
+            hasMovement = true;
+            setLastStateChangeTime(prev => new Map(prev.set(index, now)));
+          } else if (shouldMove) {
+            // 目標方向に到達したら0.1移動してタイムスタンプ更新
+            const moveDistance = 0.1;
+            const normalizedDirection = {
+              x: dx / distance,
+              y: dy / distance,
+              z: dz / distance,
+            };
+
+            newFloats[index] = {
+              ...floatInfo,
+              position: {
+                x: floatInfo.position.x + normalizedDirection.x * moveDistance,
+                y: floatInfo.position.y + normalizedDirection.y * moveDistance,
+                z: floatInfo.position.z + normalizedDirection.z * moveDistance,
+              },
+            };
+            hasMovement = true;
+            setLastStateChangeTime(prev => new Map(prev.set(index, now)));
+          } else if (now - lastChange > 300) {
+            // 0.3秒間状態変更がなければfloatに戻す
+            newFloats[index] = {
+              ...floatInfo,
+              status: "float",
+            };
+            hasMovement = true;
+            setLastStateChangeTime(prev => new Map(prev.set(index, now)));
+          }
+        } else if (floatInfo.status === "float" && shouldMove) {
+          // floatステータスから目標到達が検知されたらmovingに変更
+          newFloats[index] = {
+            ...floatInfo,
+            status: "moving",
+          };
+          hasMovement = true;
+          setLastStateChangeTime(prev => new Map(prev.set(index, now)));
+        }
+      });
+
+      if (hasMovement) {
+        // マルチウィンドウに更新を送信
+        newFloats.forEach((floatInfo, index) => {
+          if (floatInfo && childWindow && !childWindow.closed) {
+            childWindow.postMessage({
+              type: `FLOAT_${index}_STATE_UPDATE`,
+              objectState: {
+                position: [
+                  floatInfo.position.x,
+                  floatInfo.position.y,
+                  floatInfo.position.z,
+                ],
+                rotation: [0, 0, 0],
+              },
+            });
+          }
+        });
+      }
+
+      return newFloats;
+    });
+  }, [players, checkAndMoveToTarget, childWindow, lastStateChangeTime]);
 
   //マルチウィンドウの処理
   useEffect(() => {
@@ -390,6 +456,7 @@ export default function Game() {
       )}
       <Canvas>
         <CameraController offset={currentCameraOffset} />
+        <FloatController onMove={moveFloatTowardsPlayer} />
         <ambientLight intensity={Math.PI / 2} />
         <spotLight
           position={[10, 10, 10]}
@@ -399,10 +466,6 @@ export default function Game() {
           intensity={Math.PI}
         />
         <pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />
-        {/* <mesh onClick={handleCanvasClick} visible={false}>
-          <planeGeometry args={[100, 100]} />
-          <meshBasicMaterial />
-        </mesh> */}
         {!isChild && (
           <CpuFish
             initialPosition={[0, 0, 0]}
@@ -419,27 +482,6 @@ export default function Game() {
             rotation={receivedFishState?.rotation}
           />
         )}
-
-        {/* マーカーキューブの表示 */}
-        {/* {markerPosition && !isChild && (
-          <mesh position={markerPosition}>
-            <boxGeometry args={[0.2, 0.2, 0.2]} />
-            <meshBasicMaterial color="red" transparent opacity={0.7} />
-          </mesh>
-        )} */}
-
-        {isChild &&
-          Object.entries(receivedFloatStates).map(([floatId, floatState]) => {
-            if (!floatState) return null;
-            return (
-              <FloatModel
-                key={`received-float-${floatId}`}
-                position={floatState.position}
-                rotation={[Math.PI / 2, 0, 0]}
-                status="float"
-              />
-            );
-          })}
 
         {/* プレイヤーキューブの配置 */}
         {!isChild &&
@@ -469,7 +511,10 @@ export default function Game() {
         {/* 投げられた浮きの表示 */}
         {!isChild &&
           playerFloats.map((floatInfo, index) => {
-            if (floatInfo?.status === "float") {
+            if (
+              floatInfo?.status === "float" ||
+              floatInfo?.status === "moving"
+            ) {
               const colors = ["#ff4444", "#44ff44", "#4444ff", "#ffff44"];
               const playerColor = colors[index] || "#ffffff";
               return (
@@ -482,7 +527,13 @@ export default function Game() {
                   ]}
                 >
                   <boxGeometry args={[0.3, 0.3, 0.3]} />
-                  <meshStandardMaterial color={playerColor} />
+                  <meshStandardMaterial
+                    color={playerColor}
+                    emissive={
+                      floatInfo.status === "moving" ? playerColor : "#000000"
+                    }
+                    emissiveIntensity={floatInfo.status === "moving" ? 0.3 : 0}
+                  />
                 </mesh>
               );
             }
@@ -526,6 +577,7 @@ export default function Game() {
           <div>🎮 Click cube to connect JoyCon</div>
           <div>🔄 Double-click to switch stick</div>
           <div>🕹️ Move stick to rotate cube</div>
+          <div>🌀 Rotate stick clockwise to reel in float</div>
         </div>
       )}
     </>
