@@ -1,11 +1,13 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import CpuFish from "../../CpuFish";
 import type { Float } from "../../../types/float";
 import FloatModel from "../../Float";
 import type { ObjectState } from "../../../types/multWindow";
 import TestFish from "../../TestFish";
 import type { Position } from "../../../types/three";
+import { useJoyCon } from "../../../hooks/useJoycon";
+import { Text } from "@react-three/drei";
 interface CameraOffset {
   x: number;
   y: number;
@@ -23,7 +25,101 @@ const CameraController = ({ offset }: { offset: CameraOffset }) => {
   return null;
 };
 
+const PlayerCube = ({
+  player,
+  position,
+  playerId,
+  onConnect,
+  onToggleStick,
+}: {
+  player: any;
+  position: [number, number, number];
+  playerId: number;
+  onConnect: (id: number) => void;
+  onToggleStick: (id: number) => void;
+}) => {
+  const meshRef = useRef<any>();
+  const colors = ["#ff4444", "#44ff44", "#4444ff", "#ffff44"];
+
+  useFrame(() => {
+    if (meshRef.current) {
+      meshRef.current.rotation.z = ((player.rotation || 0) * Math.PI) / 180;
+    }
+  });
+
+  const stick = player.useRightStick
+    ? player.data?.rightStick
+    : player.data?.leftStick;
+
+  return (
+    <group position={position}>
+      <mesh
+        ref={meshRef}
+        onClick={() => !player.isConnected && onConnect(playerId)}
+        onDoubleClick={() => player.isConnected && onToggleStick(playerId)}
+      >
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial
+          color={colors[playerId]}
+          opacity={player.isConnected ? 1 : 0.5}
+          transparent
+        />
+      </mesh>
+
+      {/* プレイヤー番号 */}
+      {/* <Text
+        position={[0, 0, 0.6]}
+        fontSize={0.3}
+        color="white"
+        anchorX="center"
+        anchorY="middle"
+      >
+        P{playerId + 1}
+      </Text> */}
+
+      {/* 接続状態表示 */}
+      {/* <Text
+        position={[0, -0.3, 0.6]}
+        fontSize={0.15}
+        color="white"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {player.isConnected ? player.deviceName : "Click to Connect"}
+      </Text> */}
+
+      {/* スティック切り替え表示 */}
+      {player.isConnected && (
+        <Text
+          position={[0, -0.5, 0.6]}
+          fontSize={0.1}
+          color="yellow"
+          anchorX="center"
+          anchorY="middle"
+        >
+          {player.useRightStick ? "Right Stick" : "Left Stick"}
+        </Text>
+      )}
+
+      {/* 方向矢印 */}
+      {stick && (stick.direction === "left" || stick.direction === "right") && (
+        <group position={[0, 0, 0.8]}>
+          <mesh rotation={[0, 0, stick.direction === "right" ? 0 : Math.PI]}>
+            <coneGeometry args={[0.1, 0.3, 3]} />
+            <meshStandardMaterial color="white" />
+          </mesh>
+          <mesh position={[0, 0, -0.2]}>
+            <cylinderGeometry args={[0.03, 0.03, 0.2]} />
+            <meshStandardMaterial color="white" />
+          </mesh>
+        </group>
+      )}
+    </group>
+  );
+};
+
 export default function Game() {
+  const { players, connect, toggleStick, lastError } = useJoyCon();
   const [floatsInfo, setFloatsInfo] = useState<Float[]>([
     {
       status: "idle",
@@ -382,7 +478,69 @@ export default function Game() {
                 rotation={[Math.PI / 2, 0, 0]}
               />
             )}
+
+        {/* プレイヤーキューブの配置 */}
+        {!isChild &&
+          players.map((player, index) => {
+            const spacing = 4;
+            const startX = (-(players.length - 1) * spacing) / 2;
+            const position: [number, number, number] = [
+              startX + index * spacing,
+              -5,
+              0,
+            ];
+
+            return (
+              <PlayerCube
+                key={player.id}
+                player={player}
+                position={position}
+                playerId={index}
+                onConnect={connect}
+                onToggleStick={toggleStick}
+              />
+            );
+          })}
       </Canvas>
+
+      {/* エラー表示 */}
+      {lastError && !isChild && (
+        <div
+          style={{
+            position: "absolute",
+            top: 20,
+            right: 20,
+            backgroundColor: "rgba(255, 0, 0, 0.8)",
+            color: "white",
+            padding: 10,
+            borderRadius: 5,
+            zIndex: 1000,
+          }}
+        >
+          Error: {lastError}
+        </div>
+      )}
+
+      {/* 操作説明 */}
+      {!isChild && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 20,
+            left: 20,
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            color: "white",
+            padding: 15,
+            borderRadius: 5,
+            fontSize: 14,
+            zIndex: 1000,
+          }}
+        >
+          <div>🎮 Click cube to connect JoyCon</div>
+          <div>🔄 Double-click to switch stick</div>
+          <div>🕹️ Move stick to rotate cube</div>
+        </div>
+      )}
     </>
   );
 }

@@ -38,12 +38,29 @@ export interface JoyConSensorData {
   timer: number;
 }
 
+interface JoyConPlayer {
+  id: number;
+  isConnected: boolean;
+  deviceName: string | null;
+  data: JoyConSensorData | null;
+  device: HIDDevice | null;
+  rotation: number;
+  useRightStick: boolean;
+}
+
 export function useJoyCon() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [deviceName, setDeviceName] = useState<string | null>(null);
+  const [players, setPlayers] = useState<JoyConPlayer[]>(() => 
+    Array.from({ length: 4 }, (_, i) => ({
+      id: i,
+      isConnected: false,
+      deviceName: null,
+      data: null,
+      device: null,
+      rotation: 0,
+      useRightStick: false,
+    }))
+  );
   const [lastError, setLastError] = useState<string | null>(null);
-  const [data, setData] = useState<JoyConSensorData | null>(null);
-  const deviceRef = useRef<HIDDevice | null>(null);
 
   // int16変換
   const int16 = (n: number) => (n > 0x7fff ? n - 0x10000 : n);
@@ -160,7 +177,7 @@ export function useJoyCon() {
   };
 
   // Joy-Con接続
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (playerId: number) => {
     try {
       const devices = await navigator.hid.requestDevice({
         filters: [
@@ -172,80 +189,115 @@ export function useJoyCon() {
       const device = devices[0];
       if (!device) throw new Error("Joy-Conが選択されませんでした");
       await device.open();
-      deviceRef.current = device;
-      setIsConnected(true);
-      setDeviceName(device.productName || "Joy-Con");
+      
+      setPlayers(prev => prev.map(player => 
+        player.id === playerId 
+          ? { 
+              ...player, 
+              isConnected: true, 
+              deviceName: device.productName || "Joy-Con",
+              device 
+            }
+          : player
+      ));
       setLastError(null);
 
       // 標準レポート・IMU有効化
       await device.sendReport(0x01, new Uint8Array([0x00, 0x03, 0x30]));
       await new Promise((r) => setTimeout(r, 100));
       await device.sendReport(0x01, new Uint8Array([0x00, 0x40, 0x01]));
+
+      // イベントリスナー設定
+      const handler = (event: HIDInputReportEvent) => {
+        if (event.reportId === 0x30) {
+          const arr = new Uint8Array(event.data.buffer);
+          const parsed = parseReport(arr);
+          if (parsed) {
+            setPlayers(prev => prev.map(player => 
+              player.id === playerId && player.device === device
+                ? { 
+                    ...player, 
+                    data: parsed,
+                    rotation: (() => {
+                      const stick = player.useRightStick ? parsed.rightStick : parsed.leftStick;
+                      const direction = stick.direction;
+                      if (direction === "left" || direction === "right") {
+                        return player.rotation + (direction === "right" ? 5 : -5);
+                      }
+                      return player.rotation;
+                    })()
+                  }
+                : player
+            ));
+          }
+        }
+      };
+      device.addEventListener("inputreport", handler);
     } catch (e: any) {
       setLastError(e.message);
-      setIsConnected(false);
     }
   }, []);
 
   // 切断
-  const disconnect = useCallback(async () => {
-    if (deviceRef.current) {
-      try {
-        await deviceRef.current.close();
-      } catch {}
-      deviceRef.current = null;
-    }
-    setIsConnected(false);
-    setDeviceName(null);
-    setData(null);
+  const disconnect = useCallback(async (playerId: number) => {
+    setPlayers(prev => prev.map(player => {
+      if (player.id === playerId && player.device) {
+        try {
+          player.device.close();
+        } catch {}
+        return {
+          ...player,
+          isConnected: false,
+          deviceName: null,
+          data: null,
+          device: null,
+          rotation: 0,
+          useRightStick: false,
+        };
+      }
+      return player;
+    }));
     setLastError(null);
   }, []);
 
-  // イベントリスナー
-  useEffect(() => {
-    const device = deviceRef.current;
-    if (!device) return;
-    const handler = (event: HIDInputReportEvent) => {
-      if (event.reportId === 0x30) {
-        const arr = new Uint8Array(event.data.buffer);
-        const parsed = parseReport(arr);
-        if (parsed) setData(parsed);
-      }
-    };
-    device.addEventListener("inputreport", handler);
-    return () => device.removeEventListener("inputreport", handler);
-  }, [isConnected]);
 
   // 振動
-  const sendRumble = useCallback(async (duration: number = 500) => {
-    if (!deviceRef.current) return;
-    // aka256流の簡易振動コマンド（実際は詳細設定可能）
-    await deviceRef.current.sendReport(
+  const sendRumble = useCallback(async (playerId: number, duration: number = 500) => {
+    const player = players.find(p => p.id === playerId);
+    if (!player?.device) return;
+    await player.device.sendReport(
       0x01,
       new Uint8Array([0x00, 0x48, 0x01])
     );
     setTimeout(() => {
-      deviceRef.current?.sendReport(0x01, new Uint8Array([0x00, 0x48, 0x00]));
+      player.device?.sendReport(0x01, new Uint8Array([0x00, 0x48, 0x00]));
     }, duration);
+  }, [players]);
+
+  const toggleStick = useCallback((playerId: number) => {
+    setPlayers(prev => prev.map(player => 
+      player.id === playerId 
+        ? { ...player, useRightStick: !player.useRightStick }
+        : player
+    ));
   }, []);
 
   return {
-    isConnected,
-    deviceName,
+    players,
     lastError,
-    data,
     connect,
     disconnect,
     sendRumble,
+    toggleStick,
     // 追加ユーティリティ
-    getLeftStick: () => data?.leftStick,
-    getRightStick: () => data?.rightStick,
-    getAccelerometer: () => data?.accelerometer,
-    getGyroscope: () => data?.gyroscope,
-    getAccelerometerSamples: () => data?.accelerometerSamples ?? [],
-    getGyroscopeSamples: () => data?.gyroscopeSamples ?? [],
-    getLeftStickDirection: () => data?.leftStick.direction ?? "neutral",
-    getRightStickDirection: () => data?.rightStick.direction ?? "neutral",
-    isButtonPressed: (btn: string) => data?.buttons[btn] ?? false,
+    getPlayer: (playerId: number) => players.find(p => p.id === playerId),
+    getPlayerData: (playerId: number) => players.find(p => p.id === playerId)?.data,
+    getLeftStick: (playerId: number) => players.find(p => p.id === playerId)?.data?.leftStick,
+    getRightStick: (playerId: number) => players.find(p => p.id === playerId)?.data?.rightStick,
+    getAccelerometer: (playerId: number) => players.find(p => p.id === playerId)?.data?.accelerometer,
+    getGyroscope: (playerId: number) => players.find(p => p.id === playerId)?.data?.gyroscope,
+    getLeftStickDirection: (playerId: number) => players.find(p => p.id === playerId)?.data?.leftStick.direction ?? "neutral",
+    getRightStickDirection: (playerId: number) => players.find(p => p.id === playerId)?.data?.rightStick.direction ?? "neutral",
+    isButtonPressed: (playerId: number, btn: string) => players.find(p => p.id === playerId)?.data?.buttons[btn] ?? false,
   };
 }
