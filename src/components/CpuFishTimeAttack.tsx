@@ -105,12 +105,13 @@ const CpuFishTimeAttack = ({
 
       if (t < totalDuration) {
         // test.tsxと同様の半円運動（ただし半円のみ）
-        const radius = 5; // test.tsxと同じradius
+        const xRadius = 7; // test.tsxと同じXradius
+        const zRadius = 2;
         const angle = t; // 0からπまで（半円分）
 
-        const x = radius * Math.cos(angle + Math.PI); // +πで左端から開始
+        const x = xRadius * Math.cos(angle + Math.PI); // +πで左端から開始
         const y = 0; // Y座標は画面の真ん中（0）に固定
-        const z = 2 + radius * Math.sin(-angle + Math.PI); // カメラのz軸+2を中心とする半円
+        const z = zRadius * Math.sin(-angle + Math.PI); // カメラのz軸+2を中心とする半円
 
         // test.tsxと同様のrotation計算
         const rotationY = angle - Math.PI / 2;
@@ -280,7 +281,11 @@ const CpuFishTimeAttack = ({
     }
 
     // マルチウィンドウ用の処理
-    if (fishStatus !== "biting" && fishStatus !== "caught" && fishStatus !== "disappeared") {
+    if (
+      fishStatus !== "biting" &&
+      fishStatus !== "caught" &&
+      fishStatus !== "disappeared"
+    ) {
       handleFishStateChange?.({
         position: [
           fishXPosAnimationRef.current.get(),
@@ -331,7 +336,10 @@ const CpuFishTimeAttack = ({
     let targetPosition: Position = [randomX, randomY, randomZ];
 
     // 距離計算をswimmingまたはidleの場合のみ実行
-    if ((fishStatus === "swimming" || fishStatus === "idle") && fishStatus !== "disappeared") {
+    if (
+      (fishStatus === "swimming" || fishStatus === "idle") &&
+      fishStatus !== "disappeared"
+    ) {
       floatsInfo.forEach((float, index) => {
         const dist =
           float.status === "idle"
