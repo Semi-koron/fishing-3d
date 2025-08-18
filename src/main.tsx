@@ -5,6 +5,7 @@ import App from "./App.tsx";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Game from "./components/pages/game/game.tsx";
 import Test from "./components/pages/test/test.tsx";
+import TimeAttackGame from "./components/pages/timeAttackGame/timeAttackGame.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -13,6 +14,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/" element={<App />} />
         <Route path="/game" element={<Game />} />
         <Route path="/test" element={<Test />} />
+        <Route path="/timeAttackGame" element={<TimeAttackGame />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>
