@@ -68,6 +68,7 @@ export default function Game() {
     [key: number]: ObjectState | null;
   }>({});
   const [receivedPlayerCubes, setReceivedPlayerCubes] = useState<any[]>([]);
+  const [isUIVisible, setIsUIVisible] = useState(true);
 
   const [childWindow, setChildWindow] = useState<Window | null>(null);
   const [isChild, setIsChild] = useState(false);
@@ -576,7 +577,29 @@ export default function Game() {
 
   return (
     <>
+      {/* UI表示/非表示切り替えボタン（常に表示） */}
       {!isChild && (
+        <button
+          onClick={() => setIsUIVisible(!isUIVisible)}
+          style={{
+            position: "absolute",
+            top: "10px",
+            right: "10px",
+            zIndex: 1001,
+            padding: "8px 12px",
+            backgroundColor: isUIVisible ? "#dc3545" : "#28a745",
+            color: "white",
+            border: "none",
+            borderRadius: "5px",
+            cursor: "pointer",
+            fontSize: "14px",
+          }}
+        >
+          {isUIVisible ? "UI非表示" : "UI表示"}
+        </button>
+      )}
+
+      {!isChild && isUIVisible && (
         <>
           <button
             onClick={openChildWindow}
@@ -802,7 +825,7 @@ export default function Game() {
       </Canvas>
 
       {/* エラー表示 */}
-      {lastError && !isChild && (
+      {lastError && !isChild && isUIVisible && (
         <div
           style={{
             position: "absolute",

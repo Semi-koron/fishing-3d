@@ -77,6 +77,7 @@ export default function TimeAttackGame() {
     [key: number]: ObjectState | null;
   }>({});
   const [receivedPlayerCubes, setReceivedPlayerCubes] = useState<any[]>([]);
+  const [isUIVisible, setIsUIVisible] = useState(true);
 
   const [childWindow, setChildWindow] = useState<Window | null>(null);
   const [isChild, setIsChild] = useState(false);
@@ -633,7 +634,29 @@ export default function TimeAttackGame() {
 
   return (
     <>
+      {/* UI表示/非表示切り替えボタン（常に表示） */}
       {!isChild && (
+        <button
+          onClick={() => setIsUIVisible(!isUIVisible)}
+          style={{
+            position: "absolute",
+            top: "10px",
+            left: "10px",
+            zIndex: 1001,
+            padding: "8px 12px",
+            backgroundColor: isUIVisible ? "#dc3545" : "#28a745",
+            color: "white",
+            border: "none",
+            borderRadius: "5px",
+            cursor: "pointer",
+            fontSize: "14px",
+          }}
+        >
+          {isUIVisible ? "UI非表示" : "UI表示"}
+        </button>
+      )}
+
+      {!isChild && isUIVisible && (
         <>
           {/* ゲームUI */}
           <div
@@ -745,7 +768,7 @@ export default function TimeAttackGame() {
             onClick={openChildWindow}
             style={{
               position: "absolute",
-              top: "10px",
+              top: "50px",
               left: "10px",
               zIndex: 1000,
               padding: "10px 20px",
@@ -762,7 +785,7 @@ export default function TimeAttackGame() {
           <div
             style={{
               position: "absolute",
-              top: "60px",
+              top: "100px",
               left: "10px",
               zIndex: 1000,
               backgroundColor: "rgba(0, 0, 0, 0.8)",
@@ -977,7 +1000,7 @@ export default function TimeAttackGame() {
       </Canvas>
 
       {/* エラー表示 */}
-      {lastError && !isChild && (
+      {lastError && !isChild && isUIVisible && (
         <div
           style={{
             position: "absolute",
