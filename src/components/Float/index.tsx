@@ -2,7 +2,7 @@ import { Html, useGLTF } from "@react-three/drei";
 import { useRef } from "react";
 import type { Group, Vector3 } from "three";
 
-interface TestFishProps {
+interface FloatModelProps {
   position: [number, number, number];
   scale?: [number, number, number] | Vector3 | number;
   rotation: [number, number, number];
@@ -10,6 +10,7 @@ interface TestFishProps {
   autoPlay?: boolean;
   speed?: number;
   children?: React.ReactNode;
+  status?: "idle" | "float" | "moving" | "biting";
 }
 
 const FloatModel = ({
@@ -17,7 +18,8 @@ const FloatModel = ({
   rotation,
   scale = 1,
   children,
-}: TestFishProps) => {
+  status = "idle",
+}: FloatModelProps) => {
   const group = useRef<Group>(null);
 
   const { scene } = useGLTF("/float.glb");
@@ -34,6 +36,10 @@ const FloatModel = ({
         rotation={rotation}
       >
         <primitive object={scene} />
+        <meshStandardMaterial 
+          transparent={true} 
+          opacity={status === "idle" ? 0.3 : 1.0}
+        />
       </mesh>
     </>
   );

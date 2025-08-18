@@ -1,5 +1,5 @@
 import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { animated } from "@react-spring/three";
 import useFishCpu from "../hooks/useFishCpu";
 import TestFish from "./TestFish";
@@ -13,8 +13,9 @@ import { Html } from "@react-three/drei";
 interface CpuFishProps {
   initialPosition?: Position;
   targetPosition?: Position;
-  floatsInfo?: Float[];
+  floatsInfo?: Float[] | [];
   handleFishStateChange?: (state: ObjectState) => void;
+  handleFishBite?: () => void;
   scale?: [number, number, number] | number;
   animationName?: string;
   speed?: number;
@@ -24,6 +25,7 @@ const CpuFish = ({
   initialPosition = [0, 0, 0],
   targetPosition = [0, 1, 0],
   handleFishStateChange,
+  handleFishBite,
   floatsInfo = [],
   scale = 1,
   speed = 1,
@@ -34,9 +36,13 @@ const CpuFish = ({
     | "swimming" //魚が泳いでいる状態
     | "idle" //魚がじっとしている状態
     | "interested" //魚が興味を持っている状態
+    | "biting" //魚が食いついている状態
     | "escaping" //魚が逃げている状態
   >("idle");
-  const [interestedFloat, setInterestedFloat] = useState<Float | null>(null);
+  const [interestedFloatIndex, setInterestedFloatIndex] = useState<
+    number | null
+  >(null);
+  const [resetAnimation, setResetAnimation] = useState<boolean>(false);
 
   const { viewport } = useThree();
 
@@ -52,32 +58,39 @@ const CpuFish = ({
     interruptFishAnimation,
   } = useFishCpu(initialPosition, currentTarget);
 
-  useFrame(() => {
-    const bounds = {
-      minX: -viewport.width / 2,
-      maxX: viewport.width / 2,
-      minY: -viewport.height / 2,
-      maxY: viewport.height / 2,
-      minZ: -2,
-      maxZ: 2,
+  const bounds = {
+    minX: -viewport.width / 2,
+    maxX: viewport.width / 2,
+    minY: -viewport.height / 2,
+    maxY: viewport.height / 2,
+    minZ: -2,
+    maxZ: 2,
+  };
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data === 'ANIMATION_RESET') {
+        setResetAnimation(true);
+        setTimeout(() => setResetAnimation(false), 100);
+      }
     };
 
-    const randomX = Math.max(
-      bounds.minX,
-      Math.min(bounds.maxX, (Math.random() - 0.5) * viewport.width * 0.8)
-    );
-    const randomY = Math.max(
-      bounds.minY,
-      Math.min(bounds.maxY, (Math.random() - 0.5) * viewport.height * 0.8)
-    );
-    const randomZ = Math.max(
-      bounds.minZ,
-      Math.min(bounds.maxZ, (Math.random() - 0.5) * 4)
-    );
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
+  useEffect(() => {
+    if (window.opener) {
+      window.postMessage('ANIMATION_RESET', '*');
+    }
+  }, []);
+
+
+  useFrame(() => {
     // 割り込みの行動
-    if (fishStatus !== "escaping") {
+    if (fishStatus !== "escaping" && fishStatus !== "biting") {
       floatsInfo.forEach((float) => {
+        // floatがstatusがidleの場合無視
         if (float.status === "moving") {
           const dist = calcFloatFishDist(
             [
@@ -158,49 +171,33 @@ const CpuFish = ({
 
     // 行動の更新
     if (clock.get() === 0 || clock.get() === 1) {
-      if (fishStatus === "interested") return;
-      setFishStatus("idle");
-      if (Math.random() > 0.03) return;
-      let minDist = Infinity;
-      let minFloat: Float | null = null;
-      let targetPosition: Position = [randomX, randomY, randomZ];
-
-      // 距離計算をswimmingまたはidleの場合のみ実行
-      if (fishStatus === "swimming" || fishStatus === "idle") {
-        floatsInfo.forEach((float) => {
-          const dist = calcFloatFishDist(
-            [
-              fishXPosAnimationRef.current.get(),
-              fishYPosAnimationRef.current.get(),
-              fishZPosAnimationRef.current.get(),
-            ],
-            float
-          );
-          console.log(dist);
-          if (dist < 2.5 && dist < minDist) {
-            minDist = dist;
-            minFloat = float;
-            targetPosition = [
-              float.position.x,
-              float.position.y,
-              float.position.z,
-            ];
-            console.log("Fish is near a float", float);
-          }
+      if (fishStatus === "biting") {
+        handleFishBite?.();
+        handleFishStateChange?.({
+          position: [
+            floatsInfo[interestedFloatIndex!].position.x,
+            floatsInfo[interestedFloatIndex!].position.y,
+            floatsInfo[interestedFloatIndex!].position.z,
+          ],
+          rotation: [
+            0,
+            0,
+            Math.atan2(
+              floatsInfo[interestedFloatIndex!].fishermanPosition.y -
+                floatsInfo[interestedFloatIndex!].position.y,
+              floatsInfo[interestedFloatIndex!].fishermanPosition.x -
+                floatsInfo[interestedFloatIndex!].position.x
+            ) +
+              Math.PI / 2,
+          ],
         });
-
-        // 最短距離の浮きが見つかった場合、interestedFloatに設定しfishStatusをinterestedに変更
-        if (minFloat) {
-          setInterestedFloat(minFloat);
-          setFishStatus("interested");
-        } else {
-          setFishStatus("swimming");
-        }
+        return;
       }
+      fishAction();
+    }
 
-      const newTarget: Position = targetPosition;
-      setCurrentTarget(newTarget);
-      setFishPosition(newTarget[0], newTarget[1], newTarget[2]);
+    // マルチウィンドウ用の処理
+    if (fishStatus !== "biting") {
       handleFishStateChange?.({
         position: [
           fishXPosAnimationRef.current.get(),
@@ -214,8 +211,71 @@ const CpuFish = ({
         ],
       });
     }
+  });
 
-    // マルチウィンドウ用の処理
+  const fishAction = () => {
+    const randomX = Math.max(
+      bounds.minX,
+      Math.min(bounds.maxX, (Math.random() - 0.5) * viewport.width * 0.8)
+    );
+    const randomY = Math.max(
+      bounds.minY,
+      Math.min(bounds.maxY, (Math.random() - 0.5) * viewport.height * 0.8)
+    );
+    const randomZ = Math.max(
+      bounds.minZ,
+      Math.min(bounds.maxZ, (Math.random() - 0.5) * 4)
+    );
+
+    if (fishStatus === "interested") {
+      setFishStatus("biting");
+    } else {
+      setFishStatus("idle");
+    }
+    if (Math.random() > 0.03) return;
+    let minDist = Infinity;
+    let minFloat: Float | null = null;
+    let targetPosition: Position = [randomX, randomY, randomZ];
+
+    // 距離計算をswimmingまたはidleの場合のみ実行
+    if (fishStatus === "swimming" || fishStatus === "idle") {
+      floatsInfo.forEach((float, index) => {
+        const dist =
+          float.status === "idle"
+            ? Infinity
+            : calcFloatFishDist(
+                [
+                  fishXPosAnimationRef.current.get(),
+                  fishYPosAnimationRef.current.get(),
+                  fishZPosAnimationRef.current.get(),
+                ],
+                float
+              );
+        if (dist < 2.5 && dist < minDist) {
+          minDist = dist;
+          minFloat = float;
+          setInterestedFloatIndex(index);
+          targetPosition = [
+            float.position.x,
+            float.position.y,
+            float.position.z,
+          ];
+          console.log("Fish is near a float", float);
+        }
+      });
+
+      // 最短距離の浮きが見つかった場合、fishStatusをinterestedに変更
+      if (minFloat) {
+        setFishStatus("interested");
+      } else {
+        setFishStatus("swimming");
+        setInterestedFloatIndex(null);
+      }
+    }
+
+    const newTarget: Position = targetPosition;
+    setCurrentTarget(newTarget);
+    setFishPosition(newTarget[0], newTarget[1], newTarget[2]);
     handleFishStateChange?.({
       position: [
         fishXPosAnimationRef.current.get(),
@@ -228,26 +288,53 @@ const CpuFish = ({
         fishZRotAnimationRef.current.get(),
       ],
     });
-  });
+  };
 
   return (
     <>
       <Html>{fishStatus}</Html>
       <animated.group ref={groupRef}>
         <TestFish
-          position={[
-            fishXPosAnimationRef.current,
-            fishYPosAnimationRef.current,
-            fishZPosAnimationRef.current,
-          ]}
-          rotation={[
-            fishXRotAnimationRef.current,
-            fishYRotAnimationRef.current,
-            fishZRotAnimationRef.current,
-          ]}
+          position={
+            fishStatus === "biting" &&
+            interestedFloatIndex !== null &&
+            floatsInfo[interestedFloatIndex]
+              ? [
+                  floatsInfo[interestedFloatIndex].position.x,
+                  floatsInfo[interestedFloatIndex].position.y,
+                  floatsInfo[interestedFloatIndex].position.z,
+                ]
+              : [
+                  fishXPosAnimationRef.current,
+                  fishYPosAnimationRef.current,
+                  fishZPosAnimationRef.current,
+                ]
+          }
+          rotation={
+            fishStatus === "biting" &&
+            interestedFloatIndex !== null &&
+            floatsInfo[interestedFloatIndex]
+              ? [
+                  0,
+                  0,
+                  Math.atan2(
+                    floatsInfo[interestedFloatIndex].fishermanPosition.y -
+                      floatsInfo[interestedFloatIndex].position.y,
+                    floatsInfo[interestedFloatIndex].fishermanPosition.x -
+                      floatsInfo[interestedFloatIndex].position.x
+                  ) +
+                    Math.PI / 2,
+                ]
+              : [
+                  fishXRotAnimationRef.current,
+                  fishYRotAnimationRef.current,
+                  fishZRotAnimationRef.current,
+                ]
+          }
           scale={scale}
           autoPlay={true}
-          speed={speed}
+          speed={fishStatus === "biting" ? 5 : speed}
+          resetAnimation={resetAnimation}
         />
       </animated.group>
     </>
