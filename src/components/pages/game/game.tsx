@@ -41,7 +41,6 @@ interface TargetDirection {
 }
 
 export default function Game() {
-  const { players, connect, toggleStick, lastError } = useJoyCon();
   const [playerFloats, setPlayerFloats] = useState<(Float | null)[]>(
     Array.from({ length: 4 }, (_, index) => {
       const spacing = 4;
@@ -58,6 +57,8 @@ export default function Game() {
       };
     })
   );
+  const floatStates = playerFloats.map(floatInfo => floatInfo?.status || null);
+  const { players, connect, toggleStick, lastError } = useJoyCon(floatStates);
   const [isFishBiting, setIsFishBiting] = useState(false);
   const [receivedFishState, setReceivedFishState] =
     useState<ObjectState | null>(null);

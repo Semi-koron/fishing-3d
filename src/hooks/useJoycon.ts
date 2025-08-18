@@ -1,5 +1,5 @@
 /// <reference types="w3c-web-hid" />
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 // Nintendo製品ID
 export const NintendoVendorId = 0x057e;
@@ -211,7 +211,7 @@ const parseStandardReport = (data: Uint8Array): JoyConSensorData | null => {
   };
 };
 
-export function useJoyCon() {
+export function useJoyCon(floatStates?: (string | null)[]) {
   const [players, setPlayers] = useState<JoyConPlayer[]>(() =>
     Array.from({ length: 4 }, (_, i) => ({
       id: i,
@@ -225,6 +225,12 @@ export function useJoyCon() {
     }))
   );
   const [lastError, setLastError] = useState<string | null>(null);
+  const floatStatesRef = useRef<(string | null)[]>(floatStates || []);
+
+  // floatStatesが更新されたらrefも更新
+  useEffect(() => {
+    floatStatesRef.current = floatStates || [];
+  }, [floatStates]);
 
   // Joy-Con接続
   const connect = useCallback(async (playerId: number) => {
@@ -324,6 +330,12 @@ export function useJoyCon() {
                       ...player,
                       data: parsed,
                       rotation: (() => {
+                        // 浮きがidleの時のみ回転を許可
+                        const currentFloatState = floatStatesRef.current[playerId] || "idle";
+                        if (currentFloatState !== "idle") {
+                          return player.rotation;
+                        }
+
                         // 左右スティックどちらからでも回転判定
                         const leftDirection = parsed.leftStick.direction;
                         const rightDirection = parsed.rightStick.direction;

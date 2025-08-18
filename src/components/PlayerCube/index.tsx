@@ -1,5 +1,4 @@
 import { useRef, useState, useEffect } from "react";
-import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { JoyConPlayer } from "../../hooks/useJoycon";
@@ -87,11 +86,7 @@ export const PlayerCube = ({
     onCastFloat,
   ]);
 
-  useFrame(() => {
-    if (meshRef.current) {
-      meshRef.current.rotation.z = ((player.rotation || 0) * Math.PI) / 180;
-    }
-  });
+  // rotationはgroupで直接設定しているのでuseFrameは不要
 
   // 浮きの位置計算（プレイヤーキューブの前方2.5単位）
   const floatPosition: [number, number, number] = [
@@ -102,18 +97,36 @@ export const PlayerCube = ({
 
   return (
     <group position={position}>
-      <mesh
+      <group
         ref={meshRef}
-        onClick={() => !isChildWindow && !player.isConnected && onConnect(playerId)}
-        onDoubleClick={() => !isChildWindow && player.isConnected && onToggleStick(playerId)}
+        rotation={[0, 0, ((player.rotation || 0) * Math.PI) / 180]}
       >
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial
-          color={colors[playerId]}
-          opacity={player.isConnected ? 1 : 0.5}
-          transparent
-        />
-      </mesh>
+        <mesh
+          onClick={() =>
+            !isChildWindow && !player.isConnected && onConnect(playerId)
+          }
+          onDoubleClick={() =>
+            !isChildWindow && player.isConnected && onToggleStick(playerId)
+          }
+        >
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial
+            color={colors[playerId]}
+            opacity={player.isConnected ? 1 : 0.5}
+            transparent
+          />
+        </mesh>
+
+        {/* 方向指示用の小さいキューブ */}
+        <mesh position={[0.8, 0, 0]}>
+          <boxGeometry args={[0.3, 0.15, 0.15]} />
+          <meshStandardMaterial
+            color="black"
+            opacity={player.isConnected ? 0.8 : 0.3}
+            transparent
+          />
+        </mesh>
+      </group>
       {/* チャージ中の表示 */}
       {(isZlPressed || isZrPressed) && floatInfo?.status === "idle" && (
         <Text
@@ -147,20 +160,6 @@ export const PlayerCube = ({
             : "Left Stick"}
         </Text>
       )}
-
-      {/* 方向矢印 */}
-      {/* {hasLeftRightInput && currentDirection && (
-        <group position={[0, 0, 0.8]}>
-          <mesh rotation={[0, 0, currentDirection === "right" ? 0 : Math.PI]}>
-            <coneGeometry args={[0.1, 0.3, 3]} />
-            <meshStandardMaterial color="white" />
-          </mesh>
-          <mesh position={[0, 0, -0.2]}>
-            <cylinderGeometry args={[0.03, 0.03, 0.2]} />
-            <meshStandardMaterial color="white" />
-          </mesh>
-        </group>
-      )} */}
     </group>
   );
 };

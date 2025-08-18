@@ -42,7 +42,6 @@ interface TargetDirection {
 }
 
 export default function TimeAttackGame() {
-  const { players, connect, toggleStick, lastError } = useJoyCon();
   const [playerFloats, setPlayerFloats] = useState<(Float | null)[]>(
     Array.from({ length: 4 }, (_, index) => {
       const spacing = 4;
@@ -59,6 +58,8 @@ export default function TimeAttackGame() {
       };
     })
   );
+  const floatStates = playerFloats.map(floatInfo => floatInfo?.status || null);
+  const { players, connect, toggleStick, lastError } = useJoyCon(floatStates);
   const [isFishBiting, setIsFishBiting] = useState(false);
   const [caughtFishIds, setCaughtFishIds] = useState<string[]>([]);
   const [score, setScore] = useState(0);
