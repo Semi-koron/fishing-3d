@@ -10,26 +10,30 @@ import { calcFloatFishDist } from "../util/fish/float";
 import type { ObjectState } from "../types/multWindow";
 import { Html } from "@react-three/drei";
 
-interface CpuFishProps {
+interface CpuFishTimeAttackProps {
   initialPosition?: Position;
   targetPosition?: Position;
   floatsInfo?: Float[] | [];
   handleFishStateChange?: (state: ObjectState) => void;
   handleFishBite?: () => void;
+  handleFishCaught?: (fishId: string) => void; // 魚が釣れた時のコールバック
   scale?: [number, number, number] | number;
   animationName?: string;
   speed?: number;
+  fishId?: string; // 魚の識別用ID
 }
 
-const CpuFish = ({
+const CpuFishTimeAttack = ({
   initialPosition = [0, 0, 0],
   targetPosition = [0, 1, 0],
   handleFishStateChange,
   handleFishBite,
+  handleFishCaught,
   floatsInfo = [],
   scale = 1,
   speed = 1,
-}: CpuFishProps) => {
+  fishId = "fish_1",
+}: CpuFishTimeAttackProps) => {
   const groupRef = useRef<Group>(null);
   const [currentTarget, setCurrentTarget] = useState<Position>(targetPosition);
   const [fishStatus, setFishStatus] = useState<
@@ -39,6 +43,7 @@ const CpuFish = ({
     | "biting" //魚が食いついている状態
     | "escaping" //魚が逃げている状態
     | "caught" //魚が釣れている状態
+    | "disappeared" //魚が消えた状態
   >("idle");
   const [interestedFloatIndex, setInterestedFloatIndex] = useState<
     number | null
@@ -119,10 +124,9 @@ const CpuFish = ({
         caughtPositionRef.current = position;
         caughtRotationRef.current = rotation;
       } else {
-        // アニメーション完了後にリセット
-        setIsCaught(false);
-        setFishStatus("idle");
-        setInterestedFloatIndex(null);
+        // アニメーション完了後に魚を消す
+        setFishStatus("disappeared");
+        handleFishCaught?.(fishId); // 親コンポーネントに釣れたことを通知
         caughtAnimationTimeRef.current = 0;
         caughtPositionRef.current = [0, 0, 0];
         caughtRotationRef.current = [0, 0, 0];
@@ -153,6 +157,11 @@ const CpuFish = ({
           caughtAnimationTimeRef.current = 0;
         }
       }
+    }
+
+    // 魚が消えた状態の場合は何もしない
+    if (fishStatus === "disappeared") {
+      return;
     }
 
     // 割り込みの行動
@@ -265,13 +274,13 @@ const CpuFish = ({
         });
         return;
       }
-      if (fishStatus !== "caught") {
+      if (fishStatus !== "caught" && fishStatus !== "disappeared") {
         fishAction();
       }
     }
 
     // マルチウィンドウ用の処理
-    if (fishStatus !== "biting" && fishStatus !== "caught") {
+    if (fishStatus !== "biting" && fishStatus !== "caught" && fishStatus !== "disappeared") {
       handleFishStateChange?.({
         position: [
           fishXPosAnimationRef.current.get(),
@@ -293,6 +302,11 @@ const CpuFish = ({
   });
 
   const fishAction = () => {
+    // 魚が消えた状態の場合は何もしない
+    if (fishStatus === "disappeared") {
+      return;
+    }
+
     const randomX = Math.max(
       bounds.minX,
       Math.min(bounds.maxX, (Math.random() - 0.5) * viewport.width * 0.8)
@@ -308,7 +322,7 @@ const CpuFish = ({
 
     if (fishStatus === "interested") {
       setFishStatus("biting");
-    } else {
+    } else if (fishStatus !== "disappeared") {
       setFishStatus("idle");
     }
     if (Math.random() > 0.03) return;
@@ -317,7 +331,7 @@ const CpuFish = ({
     let targetPosition: Position = [randomX, randomY, randomZ];
 
     // 距離計算をswimmingまたはidleの場合のみ実行
-    if (fishStatus === "swimming" || fishStatus === "idle") {
+    if ((fishStatus === "swimming" || fishStatus === "idle") && fishStatus !== "disappeared") {
       floatsInfo.forEach((float, index) => {
         const dist =
           float.status === "idle"
@@ -368,6 +382,11 @@ const CpuFish = ({
       ],
     });
   };
+
+  // 魚が消えた状態の場合は何も表示しない
+  if (fishStatus === "disappeared") {
+    return null;
+  }
 
   return (
     <>
@@ -424,4 +443,4 @@ const CpuFish = ({
   );
 };
 
-export default CpuFish;
+export default CpuFishTimeAttack;
