@@ -62,8 +62,10 @@ export default function TimeAttack() {
   const [caughtFishIds, setCaughtFishIds] = useState<string[]>([]);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(60); // 60秒のタイムアタック
-  const [gameStatus, setGameStatus] = useState<'waiting' | 'playing' | 'finished'>('waiting');
-  
+  const [gameStatus, setGameStatus] = useState<
+    "waiting" | "playing" | "finished"
+  >("waiting");
+
   const [childWindow, setChildWindow] = useState<Window | null>(null);
   const [isChild, setIsChild] = useState(false);
   const [cameraOffset, setCameraOffset] = useState<CameraOffset>({
@@ -147,7 +149,7 @@ export default function TimeAttack() {
 
   // ゲーム開始処理
   const startGame = () => {
-    setGameStatus('playing');
+    setGameStatus("playing");
     setScore(0);
     setTimeLeft(60);
     setCaughtFishIds([]);
@@ -155,17 +157,17 @@ export default function TimeAttack() {
 
   // ゲーム終了処理
   const endGame = () => {
-    setGameStatus('finished');
+    setGameStatus("finished");
   };
 
   // タイマー処理
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (gameStatus === 'playing' && timeLeft > 0) {
+    if (gameStatus === "playing" && timeLeft > 0) {
       timer = setInterval(() => {
-        setTimeLeft(prev => {
+        setTimeLeft((prev) => {
           if (prev <= 1) {
-            setGameStatus('finished');
+            setGameStatus("finished");
             return 0;
           }
           return prev - 1;
@@ -177,8 +179,8 @@ export default function TimeAttack() {
 
   // 魚が釣れた時の処理
   const handleFishCaught = useCallback((fishId: string) => {
-    setCaughtFishIds(prev => [...prev, fishId]);
-    setScore(prev => prev + 1);
+    setCaughtFishIds((prev) => [...prev, fishId]);
+    setScore((prev) => prev + 1);
   }, []);
 
   const sendGameStateUpdate = useCallback(
@@ -242,7 +244,7 @@ export default function TimeAttack() {
 
   // floatを移動させるための関数
   const moveFloatTowardsPlayer = useCallback(() => {
-    if (gameStatus !== 'playing') return; // ゲーム中のみ動作
+    if (gameStatus !== "playing") return; // ゲーム中のみ動作
 
     const now = Date.now();
 
@@ -422,7 +424,7 @@ export default function TimeAttack() {
     direction: number,
     power: number
   ) => {
-    if (gameStatus !== 'playing') return; // ゲーム中のみ投げられる
+    if (gameStatus !== "playing") return; // ゲーム中のみ投げられる
 
     setPlayerFloats((prev) => {
       const newFloats = [...prev];
@@ -484,8 +486,8 @@ export default function TimeAttack() {
             <div style={{ marginBottom: "10px" }}>🎣 タイムアタック</div>
             <div style={{ marginBottom: "10px" }}>スコア: {score}</div>
             <div style={{ marginBottom: "10px" }}>残り時間: {timeLeft}秒</div>
-            
-            {gameStatus === 'waiting' && (
+
+            {gameStatus === "waiting" && (
               <button
                 onClick={startGame}
                 style={{
@@ -501,13 +503,21 @@ export default function TimeAttack() {
                 ゲーム開始
               </button>
             )}
-            
-            {gameStatus === 'finished' && (
+
+            {gameStatus === "finished" && (
               <div>
-                <div style={{ marginBottom: "10px", fontSize: "20px", fontWeight: "bold" }}>
+                <div
+                  style={{
+                    marginBottom: "10px",
+                    fontSize: "20px",
+                    fontWeight: "bold",
+                  }}
+                >
                   ゲーム終了！
                 </div>
-                <div style={{ marginBottom: "10px" }}>最終スコア: {score}匹</div>
+                <div style={{ marginBottom: "10px" }}>
+                  最終スコア: {score}匹
+                </div>
                 <button
                   onClick={startGame}
                   style={{
@@ -543,7 +553,7 @@ export default function TimeAttack() {
           >
             子ウィンドウを開く
           </button>
-          
+
           <div
             style={{
               position: "absolute",
@@ -624,9 +634,9 @@ export default function TimeAttack() {
           intensity={Math.PI}
         />
         <pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />
-        
+
         {/* 複数の魚を表示（ゲーム中のみ） */}
-        {!isChild && gameStatus === 'playing' && (
+        {!isChild && gameStatus === "playing" && (
           <>
             {/* 釣れていない魚のみ表示 */}
             {Array.from({ length: 3 }, (_, index) => {
@@ -634,7 +644,7 @@ export default function TimeAttack() {
               if (caughtFishIds.includes(fishId)) {
                 return null; // 釣れた魚は表示しない
               }
-              
+
               return (
                 <CpuFishTimeAttack
                   key={fishId}
@@ -649,7 +659,9 @@ export default function TimeAttack() {
                   speed={1}
                   handleFishBite={handleFishBite}
                   handleFishCaught={handleFishCaught}
-                  floatsInfo={playerFloats.filter((f): f is Float => f !== null)}
+                  floatsInfo={playerFloats.filter(
+                    (f): f is Float => f !== null
+                  )}
                 />
               );
             })}
@@ -739,29 +751,6 @@ export default function TimeAttack() {
           }}
         >
           Error: {lastError}
-        </div>
-      )}
-
-      {/* 操作説明 */}
-      {!isChild && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: 20,
-            left: 20,
-            backgroundColor: "rgba(0, 0, 0, 0.8)",
-            color: "white",
-            padding: 15,
-            borderRadius: 5,
-            fontSize: 14,
-            zIndex: 1000,
-          }}
-        >
-          <div>🎮 Click cube to connect JoyCon</div>
-          <div>🔄 Double-click to switch stick</div>
-          <div>🕹️ Move stick to rotate cube</div>
-          <div>🌀 Rotate stick clockwise to reel in float</div>
-          <div>🎣 Catch as many fish as possible in 60 seconds!</div>
         </div>
       )}
     </>

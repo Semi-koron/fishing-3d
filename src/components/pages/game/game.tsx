@@ -57,7 +57,9 @@ export default function Game() {
       };
     })
   );
-  const floatStates = playerFloats.map(floatInfo => floatInfo?.status || null);
+  const floatStates = playerFloats.map(
+    (floatInfo) => floatInfo?.status || null
+  );
   const { players, connect, toggleStick, lastError } = useJoyCon(floatStates);
   const [isFishBiting, setIsFishBiting] = useState(false);
   const [receivedFishState, setReceivedFishState] =
@@ -814,28 +816,6 @@ export default function Game() {
           }}
         >
           Error: {lastError}
-        </div>
-      )}
-
-      {/* 操作説明 */}
-      {!isChild && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: 20,
-            left: 20,
-            backgroundColor: "rgba(0, 0, 0, 0.8)",
-            color: "white",
-            padding: 15,
-            borderRadius: 5,
-            fontSize: 14,
-            zIndex: 1000,
-          }}
-        >
-          <div>🎮 Click cube to connect JoyCon</div>
-          <div>🔄 Double-click to switch stick</div>
-          <div>🕹️ Move stick to rotate cube</div>
-          <div>🌀 Rotate stick clockwise to reel in float</div>
         </div>
       )}
     </>

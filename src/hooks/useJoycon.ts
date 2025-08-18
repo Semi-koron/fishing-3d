@@ -251,7 +251,7 @@ export function useJoyCon(floatStates?: (string | null)[]) {
       // デバイスタイプを判定
       let deviceType: "left" | "right" | "pro" | null = null;
       let useRightStick = false;
-      
+
       if (device.productId === JoyConLProductId) {
         deviceType = "left";
         useRightStick = false; // 左Joy-Conは左スティック使用
@@ -331,7 +331,8 @@ export function useJoyCon(floatStates?: (string | null)[]) {
                       data: parsed,
                       rotation: (() => {
                         // 浮きがidleの時のみ回転を許可
-                        const currentFloatState = floatStatesRef.current[playerId] || "idle";
+                        const currentFloatState =
+                          floatStatesRef.current[playerId] || "idle";
                         if (currentFloatState !== "idle") {
                           return player.rotation;
                         }
@@ -339,17 +340,25 @@ export function useJoyCon(floatStates?: (string | null)[]) {
                         // 左右スティックどちらからでも回転判定
                         const leftDirection = parsed.leftStick.direction;
                         const rightDirection = parsed.rightStick.direction;
-                        
+
                         // 左スティックの方向をチェック
-                        if (leftDirection === "left" || leftDirection === "right") {
+                        if (
+                          leftDirection === "left" ||
+                          leftDirection === "right"
+                        ) {
                           return (
-                            player.rotation + (leftDirection === "right" ? 5 : -5)
+                            player.rotation +
+                            (leftDirection === "right" ? -5 : 5)
                           );
                         }
                         // 右スティックの方向をチェック
-                        if (rightDirection === "left" || rightDirection === "right") {
+                        if (
+                          rightDirection === "left" ||
+                          rightDirection === "right"
+                        ) {
                           return (
-                            player.rotation + (rightDirection === "right" ? 5 : -5)
+                            player.rotation +
+                            (rightDirection === "right" ? -5 : 5)
                           );
                         }
                         return player.rotation;
