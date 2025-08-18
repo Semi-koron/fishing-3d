@@ -21,6 +21,7 @@ interface CpuFishTimeAttackProps {
   animationName?: string;
   speed?: number;
   fishId?: string; // 魚の識別用ID
+  fishType?: "smallfish" | "niji" | "same" | "medaka";
 }
 
 const CpuFishTimeAttack = ({
@@ -33,6 +34,7 @@ const CpuFishTimeAttack = ({
   scale = 1,
   speed = 1,
   fishId = "fish_1",
+  fishType = "smallfish",
 }: CpuFishTimeAttackProps) => {
   const groupRef = useRef<Group>(null);
   const [currentTarget, setCurrentTarget] = useState<Position>(targetPosition);
@@ -445,6 +447,7 @@ const CpuFishTimeAttack = ({
           autoPlay={true}
           speed={fishStatus === "biting" || fishStatus === "caught" ? 5 : speed}
           resetAnimation={resetAnimation}
+          fishType={fishType}
         />
       </animated.group>
     </>

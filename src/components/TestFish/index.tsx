@@ -24,6 +24,7 @@ interface TestFishProps {
   autoPlay?: boolean;
   speed?: number;
   resetAnimation?: boolean;
+  fishType?: "smallfish" | "niji" | "same" | "medaka";
 }
 
 const TestFish = ({
@@ -34,10 +35,25 @@ const TestFish = ({
   autoPlay = true,
   speed = 1,
   resetAnimation = false,
+  fishType = "smallfish",
 }: TestFishProps) => {
   const group = useRef<Group>(null);
 
-  const { animations, scene } = useGLTF("/smallfish.glb");
+  const getModelPath = (type: string) => {
+    switch (type) {
+      case "niji":
+        return "/niji.glb";
+      case "same":
+        return "/same.glb";
+      case "medaka":
+        return "/medaka.glb";
+      case "smallfish":
+      default:
+        return "/smallfish.glb";
+    }
+  };
+
+  const { animations, scene } = useGLTF(getModelPath(fishType));
   const { actions, names } = useAnimations(animations, group);
 
   useEffect(() => {
