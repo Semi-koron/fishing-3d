@@ -39,6 +39,7 @@ const FloatController = ({ onMove }: { onMove: () => void }) => {
 interface TargetDirection {
   current: StickDirection;
   next: StickDirection;
+  nextNext: StickDirection;
 }
 
 export default function TimeAttackGame() {
@@ -152,6 +153,25 @@ export default function TimeAttackGame() {
     return clockwisePattern[(currentIndex + 1) % clockwisePattern.length];
   };
 
+  // 時計回りの次の次の方向を取得する関数
+  const getNextNextClockwiseDirection = (
+    current: StickDirection
+  ): StickDirection => {
+    const clockwisePattern: StickDirection[] = [
+      "right",
+      "down-right",
+      "down",
+      "down-left",
+      "left",
+      "up-left",
+      "up",
+      "up-right",
+    ];
+    const currentIndex = clockwisePattern.indexOf(current);
+    if (currentIndex === -1) return "down"; // デフォルト
+    return clockwisePattern[(currentIndex + 2) % clockwisePattern.length];
+  };
+
   // 目標方向に到達したかチェックし、到達していたら移動して次の目標を設定
   const checkAndMoveToTarget = useCallback(
     (direction: StickDirection, playerId: number): boolean => {
@@ -161,12 +181,14 @@ export default function TimeAttackGame() {
         // 初回の場合、目標方向を設定
         if (direction !== "neutral") {
           const nextDirection = getNextClockwiseDirection(direction);
+          const nextNextDirection = getNextNextClockwiseDirection(direction);
           setTargetDirections(
             (prev) =>
               new Map(
                 prev.set(playerId, {
                   current: direction,
                   next: nextDirection,
+                  nextNext: nextNextDirection,
                 })
               )
           );
@@ -174,16 +196,18 @@ export default function TimeAttackGame() {
         return false;
       }
 
-      // 目標方向に到達したかチェック
-      if (direction === target.next) {
+      // 目標方向またはその次の方向に到達したかチェック
+      if (direction === target.next || direction === target.nextNext) {
         // 到達したので次の目標を設定
         const nextDirection = getNextClockwiseDirection(direction);
+        const nextNextDirection = getNextNextClockwiseDirection(direction);
         setTargetDirections(
           (prev) =>
             new Map(
               prev.set(playerId, {
                 current: direction,
                 next: nextDirection,
+                nextNext: nextNextDirection,
               })
             )
         );
