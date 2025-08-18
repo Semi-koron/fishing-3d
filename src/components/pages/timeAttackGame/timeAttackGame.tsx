@@ -63,16 +63,26 @@ export default function TimeAttackGame() {
   );
   const { players, connect, toggleStick, lastError } = useJoyCon(floatStates);
   const [isFishBiting, setIsFishBiting] = useState(false);
-  const [fishBitingStates, setFishBitingStates] = useState<{[fishId: string]: boolean}>({});
+  const [fishBitingStates, setFishBitingStates] = useState<{
+    [fishId: string]: boolean;
+  }>({});
+  const [floatInterests, setFloatInterests] = useState<{
+    [floatIndex: number]: string;
+  }>({});
   const [caughtFishIds, setCaughtFishIds] = useState<string[]>([]);
   const [score, setScore] = useState(0);
-  
+
   // 魚の種類と生成数を定義
-  const fishTypes: Array<"smallfish" | "niji" | "same" | "medaka"> = ["smallfish", "niji", "same", "medaka"];
+  const fishTypes: Array<"smallfish" | "niji" | "same" | "medaka"> = [
+    "smallfish",
+    "niji",
+    "same",
+    "medaka",
+  ];
   const totalFishCount = fishTypes.length; // 各種類1匹ずつ
-  
+
   // 各魚の情報を管理
-  const [fishList] = useState(() => 
+  const [fishList] = useState(() =>
     fishTypes.map((type, index) => ({
       id: `fish_${type}_${index}`,
       type,
@@ -92,7 +102,11 @@ export default function TimeAttackGame() {
   const [receivedFishState, setReceivedFishState] =
     useState<ObjectState | null>(null);
   const [receivedFishStates, setReceivedFishStates] = useState<{
-    [fishId: string]: { objectState: ObjectState; fishType: string; isBiting?: boolean };
+    [fishId: string]: {
+      objectState: ObjectState;
+      fishType: string;
+      isBiting?: boolean;
+    };
   }>({});
   const [receivedFloatStates, setReceivedFloatStates] = useState<{
     [key: number]: ObjectState | null;
@@ -207,12 +221,40 @@ export default function TimeAttackGame() {
     [childWindow]
   );
 
+  // 浮きへの興味状態を管理する関数
+  const handleFloatInterest = useCallback(
+    (floatIndex: number, fishId: string, isInterested: boolean) => {
+      console.log(
+        `handleFloatInterest called: floatIndex=${floatIndex}, fishId=${fishId}, isInterested=${isInterested}`
+      );
+      setFloatInterests((prev) => {
+        const newInterests = { ...prev };
+        if (isInterested) {
+          newInterests[floatIndex] = fishId;
+          console.log(
+            `Fish ${fishId} now interested in float ${floatIndex}. Current interests:`,
+            newInterests
+          );
+        } else if (newInterests[floatIndex] === fishId) {
+          delete newInterests[floatIndex];
+          console.log(
+            `Fish ${fishId} lost interest in float ${floatIndex}. Current interests:`,
+            newInterests
+          );
+        }
+        return newInterests;
+      });
+    },
+    []
+  );
+
   // ゲーム開始処理
   const startGame = () => {
     setGameStatus("playing");
     setScore(0);
     setCaughtFishIds([]);
     setFishBitingStates({});
+    setFloatInterests({});
     setIsFishBiting(false);
     setStartTime(Date.now());
     setEndTime(0);
@@ -243,14 +285,25 @@ export default function TimeAttackGame() {
       setCaughtFishIds((prev) => {
         const newCaughtIds = [...prev, fishId];
         setScore(newCaughtIds.length);
-        
+
         // 魚のbiting状態をリセット
-        setFishBitingStates(prev => {
+        setFishBitingStates((prev) => {
           const newStates = { ...prev };
           delete newStates[fishId];
           return newStates;
         });
-        
+
+        // 魚の興味状態もリセット
+        setFloatInterests((prev) => {
+          const newInterests = { ...prev };
+          Object.keys(newInterests).forEach((floatIndex) => {
+            if (newInterests[parseInt(floatIndex)] === fishId) {
+              delete newInterests[parseInt(floatIndex)];
+            }
+          });
+          return newInterests;
+        });
+
         // 子ウィンドウに魚が釣れたことを通知（魚を削除）
         if (childWindow && !childWindow.closed) {
           childWindow.postMessage(
@@ -261,7 +314,7 @@ export default function TimeAttackGame() {
             window.location.origin
           );
         }
-        
+
         // 全ての魚を釣ったかチェック
         if (newCaughtIds.length >= totalFishCount) {
           // 全ての魚を釣った時点でタイマーをストップしてゲーム終了
@@ -271,7 +324,7 @@ export default function TimeAttackGame() {
           setFinalTime(elapsedTime);
           setGameStatus("finished");
         }
-        
+
         return newCaughtIds;
       });
     },
@@ -505,13 +558,15 @@ export default function TimeAttackGame() {
       if (event.data.type === "FISH_BITE") {
         console.log("Fish bite detected from child window");
         setIsFishBiting(true);
-        
+
         // 特定の魚のbiting状態を更新
         const { fishId } = event.data;
         if (fishId) {
           setReceivedFishStates((prev) => ({
             ...prev,
-            [fishId]: prev[fishId] ? { ...prev[fishId], isBiting: true } : prev[fishId],
+            [fishId]: prev[fishId]
+              ? { ...prev[fishId], isBiting: true }
+              : prev[fishId],
           }));
         }
       }
@@ -578,7 +633,11 @@ export default function TimeAttackGame() {
     setChildWindow(newWindow);
   };
 
-  const handleFishStateChange = (newFishState: ObjectState, fishId?: string, fishType?: string) => {
+  const handleFishStateChange = (
+    newFishState: ObjectState,
+    fishId?: string,
+    fishType?: string
+  ) => {
     if (childWindow && !childWindow.closed) {
       if (fishId && fishType) {
         // 複数魚対応の新しいメッセージ形式（biting状態も含む）
@@ -608,12 +667,12 @@ export default function TimeAttackGame() {
   const handleFishBite = (fishId?: string) => {
     // 従来の全体的なbiting状態も維持（後方互換性）
     setIsFishBiting(true);
-    
+
     // 特定の魚のbiting状態を更新
     if (fishId) {
-      setFishBitingStates(prev => ({ ...prev, [fishId]: true }));
+      setFishBitingStates((prev) => ({ ...prev, [fishId]: true }));
     }
-    
+
     if (childWindow && !childWindow.closed) {
       console.log("Sending fish bite event to child window");
       childWindow.postMessage(
@@ -965,11 +1024,12 @@ export default function TimeAttackGame() {
         <pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />
 
         {/* 複数の魚を表示（ゲーム中のみ、釣られていない魚のみ） */}
-        {!isChild && gameStatus === "playing" && 
+        {!isChild &&
+          gameStatus === "playing" &&
           fishList.map((fish) => {
             // すでに釣られた魚は表示しない
             if (caughtFishIds.includes(fish.id)) return null;
-            
+
             return (
               <CpuFishTimeAttack
                 key={fish.id}
@@ -979,34 +1039,42 @@ export default function TimeAttackGame() {
                 scale={1}
                 animationName="swim"
                 speed={1}
-                handleFishStateChange={(state) => handleFishStateChange(state, fish.id, fish.type)}
+                handleFishStateChange={(state) =>
+                  handleFishStateChange(state, fish.id, fish.type)
+                }
                 handleFishBite={() => handleFishBite(fish.id)}
                 handleFishCaught={handleFishCaught}
                 floatsInfo={playerFloats.filter((f): f is Float => f !== null)}
+                onFloatInterest={handleFloatInterest}
+                otherFishInterests={floatInterests}
               />
             );
           })}
 
         {/* 子ウィンドウでの魚表示（複数魚対応） */}
-        {isChild && 
+        {isChild &&
           Object.entries(receivedFishStates).map(([fishId, fishData]) => (
             <TestFish
               key={fishId}
               position={fishData.objectState.position}
               rotation={fishData.objectState.rotation}
               speed={fishData.isBiting ? 5 : 1}
-              fishType={fishData.fishType as "smallfish" | "niji" | "same" | "medaka"}
+              fishType={
+                fishData.fishType as "smallfish" | "niji" | "same" | "medaka"
+              }
             />
           ))}
 
         {/* 子ウィンドウでの魚表示（後方互換性のため従来形式も残す） */}
-        {isChild && receivedFishState && Object.keys(receivedFishStates).length === 0 && (
-          <TestFish
-            position={receivedFishState?.position}
-            rotation={receivedFishState?.rotation}
-            speed={isFishBiting ? 5 : 1}
-          />
-        )}
+        {isChild &&
+          receivedFishState &&
+          Object.keys(receivedFishStates).length === 0 && (
+            <TestFish
+              position={receivedFishState?.position}
+              rotation={receivedFishState?.rotation}
+              speed={isFishBiting ? 5 : 1}
+            />
+          )}
 
         {/* プレイヤーキューブの配置 */}
         {!isChild &&

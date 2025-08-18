@@ -22,6 +22,12 @@ interface CpuFishTimeAttackProps {
   speed?: number;
   fishId?: string; // 魚の識別用ID
   fishType?: "smallfish" | "niji" | "same" | "medaka";
+  onFloatInterest?: (
+    floatIndex: number,
+    fishId: string,
+    isInterested: boolean
+  ) => void; // 浮きへの興味状態の変更通知
+  otherFishInterests?: { [floatIndex: number]: string }; // 他の魚が興味を持っている浮きのマッピング
 }
 
 const CpuFishTimeAttack = ({
@@ -35,6 +41,8 @@ const CpuFishTimeAttack = ({
   speed = 1,
   fishId = "fish_1",
   fishType = "smallfish",
+  onFloatInterest,
+  otherFishInterests = {},
 }: CpuFishTimeAttackProps) => {
   const groupRef = useRef<Group>(null);
   const [currentTarget, setCurrentTarget] = useState<Position>(targetPosition);
@@ -127,6 +135,10 @@ const CpuFishTimeAttack = ({
         caughtPositionRef.current = position;
         caughtRotationRef.current = rotation;
       } else {
+        // 興味を失った通知
+        if (interestedFloatIndex !== null) {
+          onFloatInterest?.(interestedFloatIndex, fishId, false);
+        }
         // アニメーション完了後に魚を消す
         setFishStatus("disappeared");
         handleFishCaught?.(fishId); // 親コンポーネントに釣れたことを通知
@@ -336,6 +348,7 @@ const CpuFishTimeAttack = ({
     let minDist = Infinity;
     let minFloat: Float | null = null;
     let targetPosition: Position = [randomX, randomY, randomZ];
+    let newInterestedFloatIndex: number | null = null;
 
     // 距離計算をswimmingまたはidleの場合のみ実行
     if (
@@ -354,10 +367,14 @@ const CpuFishTimeAttack = ({
                 ],
                 float
               );
-        if (dist < 2.5 && dist < minDist) {
+        const isFloatOccupied =
+          otherFishInterests[index] && otherFishInterests[index] !== fishId;
+
+        if (dist < 2.5 && dist < minDist && !isFloatOccupied) {
           minDist = dist;
           minFloat = float;
-          setInterestedFloatIndex(index);
+          // floatIndexを記憶して後で通知に使用
+          newInterestedFloatIndex = index;
           targetPosition = [
             float.position.x,
             float.position.y,
@@ -368,9 +385,36 @@ const CpuFishTimeAttack = ({
       });
 
       // 最短距離の浮きが見つかった場合、fishStatusをinterestedに変更
-      if (minFloat) {
+      if (minFloat && newInterestedFloatIndex !== null) {
+        // 以前の興味を失った通知
+        if (
+          interestedFloatIndex !== null &&
+          interestedFloatIndex !== newInterestedFloatIndex
+        ) {
+          console.log(
+            `Fish ${fishId} lost interest in float ${interestedFloatIndex}`
+          );
+          onFloatInterest?.(interestedFloatIndex, fishId, false);
+        }
+
+        // 新しい興味の通知
+        if (interestedFloatIndex !== newInterestedFloatIndex) {
+          console.log(
+            `Fish ${fishId} gained interest in float ${newInterestedFloatIndex}`
+          );
+          onFloatInterest?.(newInterestedFloatIndex, fishId, true);
+        }
+
         setFishStatus("interested");
+        setInterestedFloatIndex(newInterestedFloatIndex);
       } else {
+        // 興味を失った場合も通知
+        if (interestedFloatIndex !== null) {
+          console.log(
+            `Fish ${fishId} lost interest in float ${interestedFloatIndex}`
+          );
+          onFloatInterest?.(interestedFloatIndex, fishId, false);
+        }
         setFishStatus("swimming");
         setInterestedFloatIndex(null);
       }
@@ -400,7 +444,6 @@ const CpuFishTimeAttack = ({
 
   return (
     <>
-      <Html>{fishStatus}</Html>
       <animated.group ref={groupRef}>
         <TestFish
           position={
