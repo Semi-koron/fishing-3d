@@ -43,10 +43,19 @@ interface TargetDirection {
 export default function Game() {
   const { players, connect, toggleStick, lastError } = useJoyCon();
   const [playerFloats, setPlayerFloats] = useState<(Float | null)[]>(
-    Array(4).fill({
-      status: "idle" as const,
-      position: { x: 0, y: 0, z: 0 },
-      fishermanPosition: { x: 0, y: 0, z: 0 },
+    Array.from({ length: 4 }, (_, index) => {
+      const spacing = 4;
+      const startX = (-(4 - 1) * spacing) / 2;
+      const playerPosition = {
+        x: startX + index * spacing,
+        y: -5,
+        z: 0,
+      };
+      return {
+        status: "idle" as const,
+        position: playerPosition,
+        fishermanPosition: playerPosition,
+      };
     })
   );
   const [isFishBiting, setIsFishBiting] = useState(false);
