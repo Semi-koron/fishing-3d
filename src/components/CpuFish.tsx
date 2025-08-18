@@ -1,5 +1,5 @@
 import { useFrame, useThree } from "@react-three/fiber";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { animated } from "@react-spring/three";
 import useFishCpu from "../hooks/useFishCpu";
 import TestFish from "./TestFish";
@@ -15,6 +15,7 @@ interface CpuFishProps {
   targetPosition?: Position;
   floatsInfo?: Float[] | [];
   handleFishStateChange?: (state: ObjectState) => void;
+  handleFishBite?: () => void;
   scale?: [number, number, number] | number;
   animationName?: string;
   speed?: number;
@@ -24,6 +25,7 @@ const CpuFish = ({
   initialPosition = [0, 0, 0],
   targetPosition = [0, 1, 0],
   handleFishStateChange,
+  handleFishBite,
   floatsInfo = [],
   scale = 1,
   speed = 1,
@@ -40,6 +42,7 @@ const CpuFish = ({
   const [interestedFloatIndex, setInterestedFloatIndex] = useState<
     number | null
   >(null);
+  const [resetAnimation, setResetAnimation] = useState<boolean>(false);
 
   const { viewport } = useThree();
 
@@ -63,6 +66,25 @@ const CpuFish = ({
     minZ: -2,
     maxZ: 2,
   };
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data === 'ANIMATION_RESET') {
+        setResetAnimation(true);
+        setTimeout(() => setResetAnimation(false), 100);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  useEffect(() => {
+    if (window.opener) {
+      window.postMessage('ANIMATION_RESET', '*');
+    }
+  }, []);
+
 
   useFrame(() => {
     // 割り込みの行動
@@ -149,27 +171,46 @@ const CpuFish = ({
 
     // 行動の更新
     if (clock.get() === 0 || clock.get() === 1) {
-      if (fishStatus === "biting") return;
+      if (fishStatus === "biting") {
+        handleFishBite?.();
+        handleFishStateChange?.({
+          position: [
+            floatsInfo[interestedFloatIndex!].position.x,
+            floatsInfo[interestedFloatIndex!].position.y,
+            floatsInfo[interestedFloatIndex!].position.z,
+          ],
+          rotation: [
+            0,
+            0,
+            Math.atan2(
+              floatsInfo[interestedFloatIndex!].fishermanPosition.y -
+                floatsInfo[interestedFloatIndex!].position.y,
+              floatsInfo[interestedFloatIndex!].fishermanPosition.x -
+                floatsInfo[interestedFloatIndex!].position.x
+            ) +
+              Math.PI / 2,
+          ],
+        });
+        return;
+      }
       fishAction();
     }
 
-    // 食いついた時の処理
-    if (fishStatus === "biting") {
-    }
-
     // マルチウィンドウ用の処理
-    handleFishStateChange?.({
-      position: [
-        fishXPosAnimationRef.current.get(),
-        fishYPosAnimationRef.current.get(),
-        fishZPosAnimationRef.current.get(),
-      ],
-      rotation: [
-        fishXRotAnimationRef.current.get(),
-        fishYRotAnimationRef.current.get(),
-        fishZRotAnimationRef.current.get(),
-      ],
-    });
+    if (fishStatus !== "biting") {
+      handleFishStateChange?.({
+        position: [
+          fishXPosAnimationRef.current.get(),
+          fishYPosAnimationRef.current.get(),
+          fishZPosAnimationRef.current.get(),
+        ],
+        rotation: [
+          fishXRotAnimationRef.current.get(),
+          fishYRotAnimationRef.current.get(),
+          fishZRotAnimationRef.current.get(),
+        ],
+      });
+    }
   });
 
   const fishAction = () => {
@@ -293,6 +334,7 @@ const CpuFish = ({
           scale={scale}
           autoPlay={true}
           speed={fishStatus === "biting" ? 5 : speed}
+          resetAnimation={resetAnimation}
         />
       </animated.group>
     </>

@@ -23,6 +23,7 @@ interface TestFishProps {
   animationName?: string;
   autoPlay?: boolean;
   speed?: number;
+  resetAnimation?: boolean;
 }
 
 const TestFish = ({
@@ -32,6 +33,7 @@ const TestFish = ({
   animationName,
   autoPlay = true,
   speed = 1,
+  resetAnimation = false,
 }: TestFishProps) => {
   const group = useRef<Group>(null);
 
@@ -52,6 +54,19 @@ const TestFish = ({
       }
     }
   }, [actions, names, animationName, autoPlay, speed]);
+
+  useEffect(() => {
+    if (resetAnimation) {
+      const targetAnimation = animationName || names[0];
+      if (targetAnimation && actions[targetAnimation]) {
+        const action = actions[targetAnimation];
+        action.reset();
+        if (autoPlay) {
+          action.play();
+        }
+      }
+    }
+  }, [resetAnimation, actions, names, animationName, autoPlay]);
 
   return (
     <a.mesh

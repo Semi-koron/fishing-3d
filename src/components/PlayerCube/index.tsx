@@ -14,6 +14,7 @@ interface PlayerCubeProps {
   onToggleStick: (id: number) => void;
   floatInfo: Float | null;
   onCastFloat: (playerId: number, direction: number, power: number) => void;
+  isChildWindow?: boolean;
 }
 
 export const PlayerCube = ({
@@ -24,6 +25,7 @@ export const PlayerCube = ({
   onToggleStick,
   floatInfo,
   onCastFloat,
+  isChildWindow = false,
 }: PlayerCubeProps) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const colors = ["#ff4444", "#44ff44", "#4444ff", "#ffff44"];
@@ -32,9 +34,9 @@ export const PlayerCube = ({
   const [zlStartTime, setZlStartTime] = useState<number | null>(null);
   const [zrStartTime, setZrStartTime] = useState<number | null>(null);
 
-  // ZL/ZRボタンの状態監視
+  // ZL/ZRボタンの状態監視（子ウィンドウでは無効）
   useEffect(() => {
-    if (!player.isConnected || !player.data) return;
+    if (!player.isConnected || !player.data || isChildWindow) return;
 
     const isZlCurrentlyPressed = player.data.buttons.zl;
     const isZrCurrentlyPressed = player.data.buttons.zr;
@@ -102,8 +104,8 @@ export const PlayerCube = ({
     <group position={position}>
       <mesh
         ref={meshRef}
-        onClick={() => !player.isConnected && onConnect(playerId)}
-        onDoubleClick={() => player.isConnected && onToggleStick(playerId)}
+        onClick={() => !isChildWindow && !player.isConnected && onConnect(playerId)}
+        onDoubleClick={() => !isChildWindow && player.isConnected && onToggleStick(playerId)}
       >
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial

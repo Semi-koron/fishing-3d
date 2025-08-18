@@ -49,11 +49,13 @@ export default function Game() {
       fishermanPosition: { x: 0, y: 0, z: 0 },
     })
   );
+  const [isFishBiting, setIsFishBiting] = useState(false);
   const [receivedFishState, setReceivedFishState] =
     useState<ObjectState | null>(null);
   const [receivedFloatStates, setReceivedFloatStates] = useState<{
     [key: number]: ObjectState | null;
   }>({});
+  const [receivedPlayerCubes, setReceivedPlayerCubes] = useState<any[]>([]);
 
   const [childWindow, setChildWindow] = useState<Window | null>(null);
   const [isChild, setIsChild] = useState(false);
@@ -70,12 +72,23 @@ export default function Game() {
     });
 
   // 各プレイヤーの目標方向を管理
-  const [targetDirections, setTargetDirections] = useState<Map<number, TargetDirection>>(new Map());
+  const [targetDirections, setTargetDirections] = useState<
+    Map<number, TargetDirection>
+  >(new Map());
 
   // 時計回りの次の方向を取得する関数
-  const getNextClockwiseDirection = (current: StickDirection): StickDirection => {
+  const getNextClockwiseDirection = (
+    current: StickDirection
+  ): StickDirection => {
     const clockwisePattern: StickDirection[] = [
-      "right", "down-right", "down", "down-left", "left", "up-left", "up", "up-right"
+      "right",
+      "down-right",
+      "down",
+      "down-left",
+      "left",
+      "up-left",
+      "up",
+      "up-right",
     ];
     const currentIndex = clockwisePattern.indexOf(current);
     if (currentIndex === -1) return "right"; // デフォルト
@@ -83,42 +96,112 @@ export default function Game() {
   };
 
   // 目標方向に到達したかチェックし、到達していたら移動して次の目標を設定
-  const checkAndMoveToTarget = useCallback((direction: StickDirection, playerId: number): boolean => {
-    const target = targetDirections.get(playerId);
-    
-    if (!target) {
-      // 初回の場合、目標方向を設定
-      if (direction !== "neutral") {
-        const nextDirection = getNextClockwiseDirection(direction);
-        setTargetDirections(prev => new Map(prev.set(playerId, {
-          current: direction,
-          next: nextDirection
-        })));
+  const checkAndMoveToTarget = useCallback(
+    (direction: StickDirection, playerId: number): boolean => {
+      const target = targetDirections.get(playerId);
+
+      if (!target) {
+        // 初回の場合、目標方向を設定
+        if (direction !== "neutral") {
+          const nextDirection = getNextClockwiseDirection(direction);
+          setTargetDirections(
+            (prev) =>
+              new Map(
+                prev.set(playerId, {
+                  current: direction,
+                  next: nextDirection,
+                })
+              )
+          );
+        }
+        return false;
       }
+
+      // 目標方向に到達したかチェック
+      if (direction === target.next) {
+        // 到達したので次の目標を設定
+        const nextDirection = getNextClockwiseDirection(direction);
+        setTargetDirections(
+          (prev) =>
+            new Map(
+              prev.set(playerId, {
+                current: direction,
+                next: nextDirection,
+              })
+            )
+        );
+        return true; // 移動すべき
+      }
+
       return false;
-    }
+    },
+    [targetDirections]
+  );
 
-    // 目標方向に到達したかチェック
-    if (direction === target.next) {
-      // 到達したので次の目標を設定
-      const nextDirection = getNextClockwiseDirection(direction);
-      setTargetDirections(prev => new Map(prev.set(playerId, {
-        current: direction,
-        next: nextDirection
-      })));
-      return true; // 移動すべき
-    }
-
-    return false;
-  }, [targetDirections]);
+  const sendGameStateUpdate = useCallback(
+    (updateData: {
+      playerCubes?: any[];
+      floats?: {
+        [playerId: number]: {
+          objectState: ObjectState;
+          status: string;
+          visible: boolean;
+        };
+      };
+      fish?: { objectState: ObjectState };
+      camera?: CameraOffset;
+    }) => {
+      if (childWindow && !childWindow.closed) {
+        childWindow.postMessage(
+          {
+            type: "GAME_STATE_UPDATE",
+            data: updateData,
+          },
+          window.location.origin
+        );
+      }
+    },
+    [childWindow]
+  );
 
   // floatの最後の状態変更時刻を管理
-  const [lastStateChangeTime, setLastStateChangeTime] = useState<Map<number, number>>(new Map());
+  const [lastStateChangeTime, setLastStateChangeTime] = useState<
+    Map<number, number>
+  >(new Map());
+
+  // PlayerCubeの位置情報を送信する関数
+  const sendPlayerCubesUpdate = useCallback(() => {
+    if (!childWindow || childWindow.closed) return;
+
+    const playerCubesData = players.map((player, index) => {
+      const spacing = 4;
+      const startX = (-(players.length - 1) * spacing) / 2;
+      const position = [startX + index * spacing, -5, 0];
+
+      return {
+        playerId: index,
+        position: position,
+        isConnected: player.isConnected,
+        player: {
+          id: player.id,
+          isConnected: player.isConnected,
+          deviceType: player.deviceType,
+          useRightStick: player.useRightStick,
+          rotation: player.rotation,
+          // HIDDeviceやdataオブジェクトは送信しない
+        },
+      };
+    });
+
+    sendGameStateUpdate({
+      playerCubes: playerCubesData,
+    });
+  }, [players, sendGameStateUpdate]);
 
   // floatを移動させるための関数
   const moveFloatTowardsPlayer = useCallback(() => {
     const now = Date.now();
-    
+
     setPlayerFloats((prev) => {
       const newFloats = [...prev];
       let hasMovement = false;
@@ -174,7 +257,7 @@ export default function Game() {
               position: playerPosition,
             };
             hasMovement = true;
-            setLastStateChangeTime(prev => new Map(prev.set(index, now)));
+            setLastStateChangeTime((prev) => new Map(prev.set(index, now)));
           } else if (shouldMove) {
             // 目標方向に到達したら0.1移動してタイムスタンプ更新
             const moveDistance = 0.1;
@@ -193,7 +276,7 @@ export default function Game() {
               },
             };
             hasMovement = true;
-            setLastStateChangeTime(prev => new Map(prev.set(index, now)));
+            setLastStateChangeTime((prev) => new Map(prev.set(index, now)));
           } else if (now - lastChange > 300) {
             // 0.3秒間状態変更がなければfloatに戻す
             newFloats[index] = {
@@ -201,7 +284,7 @@ export default function Game() {
               status: "float",
             };
             hasMovement = true;
-            setLastStateChangeTime(prev => new Map(prev.set(index, now)));
+            setLastStateChangeTime((prev) => new Map(prev.set(index, now)));
           }
         } else if (floatInfo.status === "float" && shouldMove) {
           // floatステータスから目標到達が検知されたらmovingに変更
@@ -210,12 +293,45 @@ export default function Game() {
             status: "moving",
           };
           hasMovement = true;
-          setLastStateChangeTime(prev => new Map(prev.set(index, now)));
+          setLastStateChangeTime((prev) => new Map(prev.set(index, now)));
         }
       });
 
       if (hasMovement) {
-        // マルチウィンドウに更新を送信
+        // 浮きの状態をキーベースで送信
+        const floatsData: {
+          [playerId: number]: {
+            objectState: ObjectState;
+            status: string;
+            visible: boolean;
+          };
+        } = {};
+
+        newFloats.forEach((floatInfo, index) => {
+          if (floatInfo) {
+            floatsData[index] = {
+              objectState: {
+                position: [
+                  floatInfo.position.x,
+                  floatInfo.position.y,
+                  floatInfo.position.z,
+                ],
+                rotation: [0, 0, 0],
+              },
+              status: floatInfo.status,
+              visible:
+                floatInfo.status === "float" ||
+                floatInfo.status === "moving" ||
+                floatInfo.status === "biting",
+            };
+          }
+        });
+
+        sendGameStateUpdate({
+          floats: floatsData,
+        });
+
+        // 従来のメッセージも保持（互換性のため）
         newFloats.forEach((floatInfo, index) => {
           if (floatInfo && childWindow && !childWindow.closed) {
             childWindow.postMessage({
@@ -235,7 +351,13 @@ export default function Game() {
 
       return newFloats;
     });
-  }, [players, checkAndMoveToTarget, childWindow, lastStateChangeTime]);
+  }, [
+    players,
+    checkAndMoveToTarget,
+    sendGameStateUpdate,
+    childWindow,
+    lastStateChangeTime,
+  ]);
 
   //マルチウィンドウの処理
   useEffect(() => {
@@ -247,6 +369,11 @@ export default function Game() {
       if (event.data.type === "OBJECT_STATE_UPDATE") {
         setReceivedFishState(event.data.objectState);
       }
+      if (event.data.type === "FISH_BITE") {
+        console.log("Fish bite detected from child window");
+        setIsFishBiting(true);
+      }
+
       // 浮きの状態を受信
       if (
         event.data.type.startsWith("FLOAT_") &&
@@ -263,6 +390,33 @@ export default function Game() {
       // カメラのオフセットを受信
       if (event.data.type === "CAMERA_OFFSET_UPDATE") {
         setReceivedCameraOffset(event.data.cameraOffset);
+      }
+      // キーベースの統合メッセージを受信
+      if (event.data.type === "GAME_STATE_UPDATE") {
+        const { playerCubes, floats, fish, camera } = event.data.data;
+
+        if (playerCubes) {
+          setReceivedPlayerCubes(playerCubes);
+        }
+
+        if (floats) {
+          Object.entries(floats).forEach(
+            ([playerId, floatData]: [string, any]) => {
+              setReceivedFloatStates((prev) => ({
+                ...prev,
+                [parseInt(playerId)]: floatData.objectState,
+              }));
+            }
+          );
+        }
+
+        if (fish) {
+          setReceivedFishState(fish.objectState);
+        }
+
+        if (camera) {
+          setReceivedCameraOffset(camera);
+        }
       }
     };
 
@@ -294,15 +448,28 @@ export default function Game() {
     }
   };
 
+  const handleFishBite = () => {
+    if (childWindow && !childWindow.closed) {
+      console.log("Sending fish bite event to child window");
+      childWindow.postMessage(
+        {
+          type: "FISH_BITE",
+        },
+        window.location.origin
+      );
+    }
+  };
+
   const handleCameraOffsetChange = (newOffset: CameraOffset) => {
     console.log("Updating camera offset:", newOffset);
     setCameraOffset(newOffset);
+    const childOffset = {
+      x: -newOffset.x,
+      y: newOffset.y,
+      z: newOffset.z,
+    };
+
     if (childWindow && !childWindow.closed) {
-      const childOffset = {
-        x: -newOffset.x,
-        y: newOffset.y,
-        z: newOffset.z,
-      };
       childWindow.postMessage(
         {
           type: "CAMERA_OFFSET_UPDATE",
@@ -344,7 +511,32 @@ export default function Game() {
           },
         };
 
-        // マルチウィンドウに浮き状態を送信
+        // キーベースで浮き状態を送信
+        const floatsData: {
+          [playerId: number]: {
+            objectState: ObjectState;
+            status: string;
+            visible: boolean;
+          };
+        } = {};
+        floatsData[playerId] = {
+          objectState: {
+            position: [
+              newFloats[playerId].position.x,
+              newFloats[playerId].position.y,
+              newFloats[playerId].position.z,
+            ],
+            rotation: [0, 0, 0],
+          },
+          status: newFloats[playerId].status,
+          visible: true,
+        };
+
+        sendGameStateUpdate({
+          floats: floatsData,
+        });
+
+        // 従来のメッセージも保持（互換性のため）
         if (childWindow && !childWindow.closed) {
           childWindow.postMessage({
             type: `FLOAT_${playerId}_STATE_UPDATE`,
@@ -362,6 +554,11 @@ export default function Game() {
       return newFloats;
     });
   };
+
+  // プレイヤーの状態が変更された際にPlayerCubeの情報を送信
+  useEffect(() => {
+    sendPlayerCubesUpdate();
+  }, [sendPlayerCubesUpdate, players]);
 
   const currentCameraOffset = isChild ? receivedCameraOffset : cameraOffset;
 
@@ -473,6 +670,7 @@ export default function Game() {
             animationName="swim"
             speed={1}
             handleFishStateChange={handleFishStateChange}
+            handleFishBite={handleFishBite}
             floatsInfo={playerFloats.filter((f): f is Float => f !== null)}
           />
         )}
@@ -480,6 +678,7 @@ export default function Game() {
           <TestFish
             position={receivedFishState?.position}
             rotation={receivedFishState?.rotation}
+            speed={isFishBiting ? 5 : 1}
           />
         )}
 
@@ -508,12 +707,29 @@ export default function Game() {
             );
           })}
 
-        {/* 投げられた浮きの表示 */}
+        {/* 子ウィンドウでのプレイヤーキューブ表示 */}
+        {isChild &&
+          receivedPlayerCubes.map((playerCubeData) => (
+            <PlayerCube
+              key={`child-${playerCubeData.playerId}`}
+              player={playerCubeData.player}
+              position={playerCubeData.position}
+              playerId={playerCubeData.playerId}
+              onConnect={() => {}} // 子ウィンドウでは接続機能は無効
+              onToggleStick={() => {}} // 子ウィンドウではトグル機能は無効
+              floatInfo={null} // 子ウィンドウでは浮き情報は別途表示
+              onCastFloat={() => {}} // 子ウィンドウでは投げ機能は無効
+              isChildWindow={true}
+            />
+          ))}
+
+        {/* 投げられた浮きの表示（親ウィンドウ） */}
         {!isChild &&
           playerFloats.map((floatInfo, index) => {
             if (
               floatInfo?.status === "float" ||
-              floatInfo?.status === "moving"
+              floatInfo?.status === "moving" ||
+              floatInfo?.status === "biting"
             ) {
               const colors = ["#ff4444", "#44ff44", "#4444ff", "#ffff44"];
               const playerColor = colors[index] || "#ffffff";
@@ -530,9 +746,41 @@ export default function Game() {
                   <meshStandardMaterial
                     color={playerColor}
                     emissive={
-                      floatInfo.status === "moving" ? playerColor : "#000000"
+                      floatInfo.status === "moving" ||
+                      floatInfo.status === "biting"
+                        ? playerColor
+                        : "#000000"
                     }
-                    emissiveIntensity={floatInfo.status === "moving" ? 0.3 : 0}
+                    emissiveIntensity={
+                      floatInfo.status === "moving"
+                        ? 0.3
+                        : floatInfo.status === "biting"
+                        ? 0.6
+                        : 0
+                    }
+                  />
+                </mesh>
+              );
+            }
+            return null;
+          })}
+
+        {/* 投げられた浮きの表示（子ウィンドウ） */}
+        {isChild &&
+          Object.entries(receivedFloatStates).map(([playerId, floatState]) => {
+            if (floatState && floatState.position) {
+              const colors = ["#ff4444", "#44ff44", "#4444ff", "#ffff44"];
+              const playerColor = colors[parseInt(playerId)] || "#ffffff";
+              return (
+                <mesh
+                  key={`child-float-${playerId}`}
+                  position={floatState.position}
+                >
+                  <boxGeometry args={[0.3, 0.3, 0.3]} />
+                  <meshStandardMaterial
+                    color={playerColor}
+                    emissive={playerColor}
+                    emissiveIntensity={0.3}
                   />
                 </mesh>
               );
