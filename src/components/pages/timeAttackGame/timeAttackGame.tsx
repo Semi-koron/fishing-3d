@@ -5,7 +5,7 @@ import type { Float } from "../../../types/float";
 import FloatModel from "../../Float";
 import type { ObjectState } from "../../../types/multWindow";
 import TestFish from "../../TestFish";
-import type { Position } from "../../../types/three";
+import * as THREE from "three";
 import { useJoyCon } from "../../../hooks/useJoycon";
 import type { StickDirection } from "../../../hooks/useJoycon";
 import { PlayerCube } from "../../PlayerCube";
@@ -15,6 +15,44 @@ interface CameraOffset {
   y: number;
   z: number;
 }
+
+const BackgroundImage = ({ imageUrl }: { imageUrl: string }) => {
+  const { scene, viewport, camera } = useThree();
+
+  useEffect(() => {
+    const loader = new THREE.TextureLoader();
+    loader.load(imageUrl, (texture) => {
+      // テクスチャのアスペクト比を計算
+      const imageAspect = texture.image.width / texture.image.height;
+      const screenAspect = viewport.width / viewport.height;
+
+      // アスペクト比に基づいてテクスチャの繰り返し設定を調整
+      if (imageAspect > screenAspect) {
+        // 画像が画面より横長の場合
+        texture.repeat.set(screenAspect / imageAspect, 1);
+        texture.offset.set((1 - screenAspect / imageAspect) / 2, 0);
+      } else {
+        // 画像が画面より縦長の場合
+        texture.repeat.set(1, imageAspect / screenAspect);
+        texture.offset.set(0, (1 - imageAspect / screenAspect) / 2);
+      }
+
+      texture.wrapS = THREE.ClampToEdgeWrap;
+      texture.wrapT = THREE.ClampToEdgeWrap;
+      texture.needsUpdate = true;
+
+      scene.background = texture;
+    });
+
+    return () => {
+      if (scene.background) {
+        scene.background = null;
+      }
+    };
+  }, [scene, viewport, imageUrl]);
+
+  return null;
+};
 
 const CameraController = ({ offset }: { offset: CameraOffset }) => {
   const { camera } = useThree();
@@ -1035,6 +1073,7 @@ export default function TimeAttackGame() {
         </>
       )}
       <Canvas>
+        <BackgroundImage imageUrl="/images/sea.png" />
         <CameraController offset={currentCameraOffset} />
         <FloatController onMove={moveFloatTowardsPlayer} />
         <ambientLight intensity={Math.PI / 2} />
